@@ -1,7 +1,9 @@
 package com.example.barberia.ui.auth
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,9 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -31,18 +35,31 @@ import com.example.barberia.model.RolEnum
 import com.example.barberia.network.AuthRepository
 import com.example.barberia.viewmodel.AuthViewModel
 
-// ── Colores del tema barbería ─────────────────────────────────────────────
-val ColorFondo      = Color(0xFF0D0D0D)
-val ColorSuperficie = Color(0xFF1A1A1A)
-val ColorDorado     = Color(0xFFC9A84C)
-val ColorTexto      = Color(0xFFF5F5F5)
-val ColorTextoSub   = Color(0xFF9E9E9E)
-val ColorError      = Color(0xFFCF6679)
+// ── Paleta de colores inspirada en el logo de barbería ──────────────────────
+// Rojo clásico de barbería
+val ColorRojo        = Color(0xFFC0272D)
+val ColorRojoClaro   = Color(0xFFE05555)
+val ColorRojoOscuro  = Color(0xFF8B1A1E)
+// Azul clásico de barbería
+val ColorAzul        = Color(0xFF1B4F9B)
+val ColorAzulClaro   = Color(0xFF4A80D4)
+// Fondos oscuros
+val ColorFondo       = Color(0xFF0A0A0A)
+val ColorSuperficie  = Color(0xFF141414)
+val ColorSuperficie2 = Color(0xFF1E1E1E)
+val ColorBorde       = Color(0xFF2A2A2A)
+// Textos
+val ColorTexto       = Color(0xFFF0F0F0)
+val ColorTextoSub    = Color(0xFF888888)
+val ColorError       = Color(0xFFCF6679)
+// Blanco para el polo
+val ColorBlanco      = Color(0xFFFFFFFF)
 
 @Composable
 fun LoginScreen(
     authRepository: AuthRepository,
-    onLoginSuccess: (RolEnum) -> Unit
+    onLoginSuccess: (RolEnum) -> Unit,
+    onNavigateToRegister: () -> Unit   // ← nueva pantalla completa de registro
 ) {
     val viewModel: AuthViewModel = viewModel(
         factory = AuthViewModel.factory(authRepository)
@@ -51,36 +68,50 @@ fun LoginScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
 
-    var isLoginMode     by remember { mutableStateOf(true) }
     var email           by remember { mutableStateOf("") }
     var password        by remember { mutableStateOf("") }
-    var nombre          by remember { mutableStateOf("") }
-    var confirmPass     by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // Navega cuando el login es exitoso
+    // Animación de entrada del logo al cargar pantalla
+    var logoVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { logoVisible = true }
+
+    val logoScale by animateFloatAsState(
+        targetValue = if (logoVisible) 1f else 0.5f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "logoScale"
+    )
+    val logoAlpha by animateFloatAsState(
+        targetValue = if (logoVisible) 1f else 0f,
+        animationSpec = tween(600),
+        label = "logoAlpha"
+    )
+
+    // Navega al dashboard correcto cuando el login es exitoso
     LaunchedEffect(uiState.loginSuccess) {
         uiState.loginSuccess?.let { onLoginSuccess(it.rol) }
-    }
-
-    // Cuando el registro es exitoso vuelve al login
-    LaunchedEffect(uiState.registerSuccess) {
-        uiState.registerSuccess?.let {
-            isLoginMode = true
-            email = it.correo
-            password = ""
-        }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF111111), Color(0xFF0A0A0A))
-                )
-            )
+            .background(ColorFondo)
     ) {
+        // Franja decorativa roja superior (evoca el polo de barbería)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(ColorRojo, ColorAzul, ColorBlanco, ColorRojo, ColorAzul)
+                    )
+                )
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -88,253 +119,339 @@ fun LoginScreen(
                 .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(72.dp))
+            Spacer(modifier = Modifier.height(60.dp))
 
-            // ── Logo ──────────────────────────────────────────────────────
-            Icon(
-                imageVector = Icons.Filled.ContentCut,
-                contentDescription = "Logo",
-                tint = ColorDorado,
-                modifier = Modifier.size(56.dp)
-            )
+            // ── Logo con animación de entrada ────────────────────────────
+            Box(
+                modifier = Modifier
+                    .scale(logoScale)
+                    .then(Modifier.then(Modifier.graphicsLayer { alpha = logoAlpha }))
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Círculo con ícono de tijeras + borde rojo
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(ColorSuperficie2),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Franja tipo polo de barbería como borde
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            ColorRojo.copy(alpha = 0.3f),
+                                            Color.Transparent,
+                                            ColorAzul.copy(alpha = 0.3f)
+                                        )
+                                    )
+                                )
+                        )
+                        Icon(
+                            imageVector = Icons.Filled.ContentCut,
+                            contentDescription = "Logo Barbería",
+                            tint = ColorRojo,
+                            modifier = Modifier.size(38.dp)
+                        )
+                    }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "BARBERÍA",
-                color = ColorDorado,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 6.sp
-            )
+                    Text(
+                        text = "BARBERÍA",
+                        color = ColorTexto,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 5.sp
+                    )
 
-            Text(
-                text = "Sistema de gestión",
-                color = ColorTextoSub,
-                fontSize = 13.sp,
-                letterSpacing = 2.sp
-            )
+                    // Franja decorativa tipo polo bajo el título
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.width(120.dp),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f).height(3.dp)
+                            .clip(RoundedCornerShape(2.dp)).background(ColorRojo))
+                        Box(modifier = Modifier.weight(1f).height(3.dp)
+                            .clip(RoundedCornerShape(2.dp)).background(ColorBlanco))
+                        Box(modifier = Modifier.weight(1f).height(3.dp)
+                            .clip(RoundedCornerShape(2.dp)).background(ColorAzul))
+                    }
 
-            Spacer(modifier = Modifier.height(48.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Sistema de gestión de citas",
+                        color = ColorTextoSub,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
 
-            // ── Tarjeta formulario ────────────────────────────────────────
+            Spacer(modifier = Modifier.height(44.dp))
+
+            // ── Tarjeta del formulario ───────────────────────────────────
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = ColorSuperficie),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-
-                    // ── Tabs ──────────────────────────────────────────────
-                    Row(
+                // Borde rojo en la parte superior de la tarjeta
+                Column {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF252525))
-                    ) {
-                        listOf("Ingresar" to true, "Registrarse" to false).forEach { (label, esLogin) ->
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (isLoginMode == esLogin) ColorDorado
-                                        else Color.Transparent
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                TextButton(
-                                    onClick = {
-                                        isLoginMode = esLogin
-                                        viewModel.clearError()
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = label,
-                                        color = if (isLoginMode == esLogin) Color.Black
-                                        else ColorTextoSub,
-                                        fontWeight = if (isLoginMode == esLogin) FontWeight.Bold
-                                        else FontWeight.Normal,
-                                        fontSize = 14.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    // ── Campo Nombre (solo registro) ──────────────────────
-                    AnimatedVisibility(
-                        visible = !isLoginMode,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Column {
-                            BarberiaTextField(
-                                value = nombre,
-                                onValueChange = { nombre = it; viewModel.clearError() },
-                                label = "Nombre completo",
-                                leadingIcon = Icons.Filled.Person,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                                keyboardActions = KeyboardActions(
-                                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                            .height(3.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(ColorRojo, ColorAzul)
                                 )
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
-                    }
-
-                    // ── Campo Email ───────────────────────────────────────
-                    BarberiaTextField(
-                        value = email,
-                        onValueChange = { email = it; viewModel.clearError() },
-                        label = "Correo electrónico",
-                        leadingIcon = Icons.Filled.Email,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        )
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // ── Campo Contraseña ──────────────────────────────────
-                    BarberiaTextField(
-                        value = password,
-                        onValueChange = { password = it; viewModel.clearError() },
-                        label = "Contraseña",
-                        leadingIcon = Icons.Filled.Lock,
-                        isPassword = true,
-                        passwordVisible = passwordVisible,
-                        onPasswordToggle = { passwordVisible = !passwordVisible },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = if (isLoginMode) ImeAction.Done else ImeAction.Next
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                if (isLoginMode) viewModel.login(email, password)
-                            },
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        )
-                    )
-
-                    // ── Campo Confirmar (solo registro) ───────────────────
-                    AnimatedVisibility(
-                        visible = !isLoginMode,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Column {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            BarberiaTextField(
-                                value = confirmPass,
-                                onValueChange = { confirmPass = it; viewModel.clearError() },
-                                label = "Confirmar contraseña",
-                                leadingIcon = Icons.Filled.LockOpen,
-                                isPassword = true,
-                                passwordVisible = passwordVisible,
-                                onPasswordToggle = { passwordVisible = !passwordVisible },
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Password,
-                                    imeAction = ImeAction.Done
-                                ),
-                                keyboardActions = KeyboardActions(
-                                    onDone = {
-                                        focusManager.clearFocus()
-                                        viewModel.register(nombre, email, password, confirmPass)
-                                    }
-                                )
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // ── Error ─────────────────────────────────────────────
-                    AnimatedVisibility(visible = uiState.errorMessage != null) {
                         Text(
-                            text = uiState.errorMessage ?: "",
-                            color = ColorError,
-                            fontSize = 13.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)
+                            text = "Iniciar sesión",
+                            color = ColorTexto,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // ── Botón principal ───────────────────────────────────
-                    Button(
-                        onClick = {
-                            focusManager.clearFocus()
-                            if (isLoginMode) viewModel.login(email, password)
-                            else viewModel.register(nombre, email, password, confirmPass)
-                        },
-                        enabled = !uiState.isLoading,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ColorDorado,
-                            disabledContainerColor = ColorDorado.copy(alpha = 0.5f)
+                        Text(
+                            text = "Ingresa con tu correo y contraseña",
+                            color = ColorTextoSub,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 4.dp)
                         )
-                    ) {
-                        if (uiState.isLoading) {
-                            CircularProgressIndicator(
-                                color = Color.Black,
-                                modifier = Modifier.size(22.dp),
-                                strokeWidth = 2.5.dp
+
+                        Spacer(modifier = Modifier.height(28.dp))
+
+                        // Campo Email
+                        BarberiaTextField(
+                            value = email,
+                            onValueChange = { email = it; viewModel.clearError() },
+                            label = "Correo electrónico",
+                            leadingIcon = Icons.Filled.Email,
+                            accentColor = ColorRojo,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Email,
+                                imeAction = ImeAction.Next
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
                             )
-                        } else {
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Campo Contraseña
+                        BarberiaTextField(
+                            value = password,
+                            onValueChange = { password = it; viewModel.clearError() },
+                            label = "Contraseña",
+                            leadingIcon = Icons.Filled.Lock,
+                            accentColor = ColorRojo,
+                            isPassword = true,
+                            passwordVisible = passwordVisible,
+                            onPasswordToggle = { passwordVisible = !passwordVisible },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    focusManager.clearFocus()
+                                    viewModel.login(email, password)
+                                }
+                            )
+                        )
+
+                        // Mensaje de error con animación
+                        AnimatedVisibility(
+                            visible = uiState.errorMessage != null,
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically()
+                        ) {
                             Text(
-                                text = if (isLoginMode) "Ingresar" else "Crear cuenta",
-                                color = Color.Black,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
+                                text = uiState.errorMessage ?: "",
+                                color = ColorError,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp)
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Botón Ingresar con animación de escala al presionar
+                        BarberiaBoton(
+                            texto = "Ingresar",
+                            icono = Icons.Filled.Login,
+                            isLoading = uiState.isLoading,
+                            colorFondo = ColorRojo,
+                            onClick = {
+                                focusManager.clearFocus()
+                                viewModel.login(email, password)
+                            }
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            if (isLoginMode) {
+            // ── Separador ────────────────────────────────────────────────
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = ColorBorde
+                )
                 Text(
-                    text = "¿Eres administrador? Usa las credenciales\nproporcionadas por tu barbería",
+                    text = "  ¿No tienes cuenta?  ",
                     color = ColorTextoSub,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 18.sp
+                    fontSize = 12.sp
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = ColorBorde
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Botón Registrarse — lleva a pantalla completa
+            OutlinedButton(
+                onClick = onNavigateToRegister,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = ColorAzulClaro
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Brush.horizontalGradient(listOf(ColorAzul, ColorAzulClaro))
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PersonAdd,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Crear cuenta nueva",
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "¿Eres administrador o barbero?\nUsa las credenciales proporcionadas",
+                color = ColorTextoSub,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 17.sp
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
 
-// ── TextField reutilizable con estilo barbería ────────────────────────────
+// ── Botón principal reutilizable con animación de escala ─────────────────────
+// Se usa en Login, Registro y en futuros dashboards
+// accentColor define el color del botón según el rol/pantalla
+@Composable
+fun BarberiaBoton(
+    texto: String,
+    icono: ImageVector? = null,
+    isLoading: Boolean = false,
+    colorFondo: Color = ColorRojo,
+    onClick: () -> Unit
+) {
+    // Animación de escala al presionar (efecto "spring" profesional)
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val escala by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "botonEscala"
+    )
+
+    Button(
+        onClick = onClick,
+        enabled = !isLoading,
+        interactionSource = interactionSource,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .scale(escala),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = colorFondo,
+            disabledContainerColor = colorFondo.copy(alpha = 0.5f)
+        ),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 1.dp
+        )
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                color = Color.White,
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.5.dp
+            )
+        } else {
+            if (icono != null) {
+                Icon(
+                    imageVector = icono,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = Color.White
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                text = texto,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                letterSpacing = 0.5.sp
+            )
+        }
+    }
+}
+
+// ── TextField reutilizable con estilo barbería y acento de color ─────────────
+// accentColor cambia según la pantalla: rojo=login, azul=registro, dorado=admin
 @Composable
 fun BarberiaTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
     leadingIcon: ImageVector,
+    accentColor: Color = ColorRojo,
     isPassword: Boolean = false,
     passwordVisible: Boolean = false,
     onPasswordToggle: (() -> Unit)? = null,
@@ -350,7 +467,7 @@ fun BarberiaTextField(
             Icon(
                 imageVector = leadingIcon,
                 contentDescription = null,
-                tint = ColorDorado,
+                tint = accentColor,
                 modifier = Modifier.size(20.dp)
             )
         },
@@ -358,8 +475,10 @@ fun BarberiaTextField(
             {
                 IconButton(onClick = onPasswordToggle) {
                     Icon(
-                        imageVector = if (passwordVisible) Icons.Filled.Visibility
-                        else Icons.Filled.VisibilityOff,
+                        imageVector = if (passwordVisible)
+                            Icons.Filled.Visibility
+                        else
+                            Icons.Filled.VisibilityOff,
                         contentDescription = null,
                         tint = ColorTextoSub,
                         modifier = Modifier.size(20.dp)
@@ -368,19 +487,21 @@ fun BarberiaTextField(
             }
         } else null,
         visualTransformation = if (isPassword && !passwordVisible)
-            PasswordVisualTransformation() else VisualTransformation.None,
+            PasswordVisualTransformation()
+        else
+            VisualTransformation.None,
         singleLine = true,
         modifier = modifier.fillMaxWidth(),
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor     = ColorDorado,
-            unfocusedBorderColor   = Color(0xFF3A3A3A),
-            focusedTextColor       = ColorTexto,
-            unfocusedTextColor     = ColorTexto,
-            cursorColor            = ColorDorado,
-            focusedContainerColor  = Color(0xFF202020),
-            unfocusedContainerColor = Color(0xFF1C1C1C)
+            focusedBorderColor      = accentColor,
+            unfocusedBorderColor    = ColorBorde,
+            focusedTextColor        = ColorTexto,
+            unfocusedTextColor      = ColorTexto,
+            cursorColor             = accentColor,
+            focusedContainerColor   = ColorSuperficie2,
+            unfocusedContainerColor = ColorSuperficie
         ),
         shape = RoundedCornerShape(12.dp)
     )

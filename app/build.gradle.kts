@@ -81,4 +81,6 @@ dependencies {
 
 // Coil — carga imágenes desde URL
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    implementation("androidx.compose.material:material-icons-extended")
 }

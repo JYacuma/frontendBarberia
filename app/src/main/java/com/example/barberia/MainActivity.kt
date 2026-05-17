@@ -7,20 +7,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.ContentCut
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,17 +27,20 @@ import androidx.navigation.compose.rememberNavController
 import com.example.barberia.model.RolEnum
 import com.example.barberia.network.AuthRepository
 import com.example.barberia.network.RetrofitClient
-import com.example.barberia.ui.auth.*
-import com.example.barberia.ui.theme.BarberiaTheme
+import com.example.barberia.ui.auth.ClienteScreen
+import com.example.barberia.ui.auth.LoginScreen
+import com.example.barberia.ui.auth.RegisterScreen
+import com.example.barberia.ui.screens.AdminScreen
+import com.example.barberia.ui.screens.BarberoScreen
+import com.example.barberia.ui.theme.*
 import com.example.barberia.utils.SessionManager
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
-// ── Rutas de navegación ──────────────────────────────────────────────────────
-// Nunca escribas strings de navegación sueltos en el código — siempre usa esto
+// ── Rutas de navegación ───────────────────────────────────────────────────────
 object Routes {
     const val LOGIN           = "login"
-    const val REGISTER        = "register"         // ← nueva ruta pantalla completa
+    const val REGISTER        = "register"
     const val CLIENTE_HOME    = "cliente_home"
     const val BARBERO_HOME    = "barbero_home"
     const val ADMIN_HOME      = "admin_home"
@@ -62,15 +57,18 @@ class MainActivity : ComponentActivity() {
         val authRepository = AuthRepository(RetrofitClient.apiService, sessionManager)
 
         setContent {
+            // BarberiaTheme aplica el esquema Material3 + provee LocalBarberiaColores
+            // a todos los composables hijo — así cualquier pantalla puede leer
+            // LocalBarberiaColores.current para adaptarse al modo claro u oscuro
             BarberiaTheme {
+                val colores = LocalBarberiaColores.current
                 val navController = rememberNavController()
 
-                // null = verificando sesión, valor = destino decidido
+                // null = verificando sesión guardada en disco
                 var startDestination by remember { mutableStateOf<String?>(null) }
 
-                // Al arrancar la app lee el rol guardado en disco
-                // Si hay sesión activa va directo al dashboard del rol
-                // Si no hay sesión va al Login
+                // Al arrancar lee el rol del DataStore
+                // Si hay sesión activa navega directo al dashboard del rol
                 LaunchedEffect(Unit) {
                     val rol = sessionManager.rol.firstOrNull()
                     startDestination = when (rol) {
@@ -85,52 +83,45 @@ class MainActivity : ComponentActivity() {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(ColorFondo)
+                        .background(colores.fondo)
                 ) {
                     if (startDestination == null) {
-                        // Spinner mínimo mientras verifica sesión en disco
+                        // Spinner mínimo mientras verifica la sesión guardada
                         CircularProgressIndicator(
-                            color = ColorRojo,
+                            color    = ColorRojo,
                             modifier = Modifier.align(Alignment.Center)
                         )
                     } else {
                         NavHost(
-                            navController = navController,
-                            startDestination = startDestination!!,
-                            // Animación de transición entre pantallas
+                            navController      = navController,
+                            startDestination   = startDestination!!,
+                            // Animación de transición entre pantallas:
+                            // fade + slide suave al navegar hacia adelante
+                            // fade + slide inverso al volver atrás
                             enterTransition = {
-                                fadeIn(animationSpec = tween(300)) +
-                                        slideInHorizontally(
-                                            animationSpec = tween(300),
-                                            initialOffsetX = { it / 4 }
-                                        )
+                                fadeIn(tween(300)) + slideInHorizontally(
+                                    tween(300)) { it / 4 }
                             },
                             exitTransition = {
-                                fadeOut(animationSpec = tween(200))
+                                fadeOut(tween(200))
                             },
                             popEnterTransition = {
-                                fadeIn(animationSpec = tween(300)) +
-                                        slideInHorizontally(
-                                            animationSpec = tween(300),
-                                            initialOffsetX = { -it / 4 }
-                                        )
+                                fadeIn(tween(300)) + slideInHorizontally(
+                                    tween(300)) { -it / 4 }
                             },
                             popExitTransition = {
-                                fadeOut(animationSpec = tween(200)) +
-                                        slideOutHorizontally(
-                                            animationSpec = tween(300),
-                                            targetOffsetX = { it / 4 }
-                                        )
+                                fadeOut(tween(200)) + slideOutHorizontally(
+                                    tween(300)) { it / 4 }
                             }
                         ) {
 
-                            // ── Login ────────────────────────────────────
+                            // ── Login ─────────────────────────────────────
                             composable(Routes.LOGIN) {
                                 LoginScreen(
-                                    authRepository = authRepository,
-                                    onLoginSuccess = { rol ->
+                                    authRepository    = authRepository,
+                                    onLoginSuccess    = { rol ->
                                         // Navega al dashboard y limpia el backstack
-                                        // (no puede volver al Login con el botón atrás)
+                                        // El usuario no puede volver al Login con atrás
                                         val dest = when (rol) {
                                             RolEnum.CLIENTE       -> Routes.CLIENTE_HOME
                                             RolEnum.BARBERO       -> Routes.BARBERO_HOME
@@ -142,31 +133,26 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     onNavigateToRegister = {
-                                        // Navega a la pantalla completa de registro
                                         navController.navigate(Routes.REGISTER)
                                     }
                                 )
                             }
 
-                            // ── Registro ─────────────────────────────────
-                            // Pantalla completa separada del Login
+                            // ── Registro — pantalla completa separada ──────
                             composable(Routes.REGISTER) {
                                 RegisterScreen(
-                                    authRepository = authRepository,
-                                    onRegistroExitoso = { correo ->
-                                        // Vuelve al Login con el correo prellenado
-                                        // (el usuario solo necesita poner la contraseña)
+                                    authRepository    = authRepository,
+                                    onRegistroExitoso = { _ ->
+                                        // Vuelve al Login después de registrarse
                                         navController.navigate(Routes.LOGIN) {
                                             popUpTo(Routes.LOGIN) { inclusive = true }
                                         }
                                     },
-                                    onVolver = {
-                                        navController.popBackStack()
-                                    }
+                                    onVolver = { navController.popBackStack() }
                                 )
                             }
 
-                            // ── Dashboard Cliente ─────────────────────────
+                            // ── Dashboard Cliente — rojo ───────────────────
                             composable(Routes.CLIENTE_HOME) {
                                 val scope = rememberCoroutineScope()
                                 val idUsuario by sessionManager.id
@@ -176,9 +162,9 @@ class MainActivity : ComponentActivity() {
 
                                 ClienteScreen(
                                     apiService = RetrofitClient.apiService,
-                                    idUsuario = idUsuario ?: 0L,
-                                    nombre = nombre ?: "Cliente",
-                                    onLogout = {
+                                    idUsuario  = idUsuario ?: 0L,
+                                    nombre     = nombre ?: "Cliente",
+                                    onLogout   = {
                                         scope.launch {
                                             authRepository.logout()
                                             navController.navigate(Routes.LOGIN) {
@@ -189,8 +175,8 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // ── Dashboard Barbero ─────────────────────────
-                            // Por implementar en el siguiente bloque
+                            // ── Dashboard Barbero — azul ───────────────────
+                            // Placeholder temporal hasta construir BarberoScreen
                             composable(Routes.BARBERO_HOME) {
                                 val scope = rememberCoroutineScope()
                                 val nombre by sessionManager.nombre
@@ -198,11 +184,14 @@ class MainActivity : ComponentActivity() {
                                 val idUsuario by sessionManager.id
                                     .collectAsStateWithLifecycle(initialValue = 0L)
 
-                                PlaceholderDashboard(
-                                    titulo = "Barbero",
-                                    subtitulo = nombre ?: "Barbero",
-                                    colorAccento = ColorAzul,
-                                    onLogout = {
+                                // idBarbero se obtiene del backend — por ahora usa idUsuario como temporal
+                                // En el siguiente paso lo resolvemos correctamente
+                                BarberoScreen(
+                                    apiService = RetrofitClient.apiService,
+                                    idBarbero  = idUsuario ?: 1L,   // ← temporal
+                                    idUsuario  = idUsuario ?: 0L,
+                                    nombre     = nombre ?: "Barbero",
+                                    onLogout   = {
                                         scope.launch {
                                             authRepository.logout()
                                             navController.navigate(Routes.LOGIN) {
@@ -213,17 +202,16 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // ── Dashboard Administrador ───────────────────
+                            // ── Dashboard Administrador — azul claro ────────
                             composable(Routes.ADMIN_HOME) {
                                 val scope = rememberCoroutineScope()
                                 val nombre by sessionManager.nombre
                                     .collectAsStateWithLifecycle(initialValue = "Administrador")
 
-                                PlaceholderDashboard(
-                                    titulo = "Administrador",
-                                    subtitulo = nombre ?: "Administrador",
-                                    colorAccento = ColorAzulClaro,
-                                    onLogout = {
+                                AdminScreen(
+                                    apiService = RetrofitClient.apiService,
+                                    nombre     = nombre ?: "Administrador",
+                                    onLogout   = {
                                         scope.launch {
                                             authRepository.logout()
                                             navController.navigate(Routes.LOGIN) {
@@ -233,18 +221,18 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
-
-                            // ── Dashboard SuperAdmin ──────────────────────
+                            // ── Dashboard SuperAdmin — dorado ───────────────
                             composable(Routes.SUPERADMIN_HOME) {
                                 val scope = rememberCoroutineScope()
                                 val nombre by sessionManager.nombre
                                     .collectAsStateWithLifecycle(initialValue = "SuperAdmin")
 
                                 PlaceholderDashboard(
-                                    titulo = "SuperAdmin",
-                                    subtitulo = nombre ?: "Admin Barbería",
-                                    colorAccento = Color(0xFFD4A017), // dorado
-                                    onLogout = {
+                                    titulo       = "SuperAdmin",
+                                    subtitulo    = nombre ?: "Admin Barbería",
+                                    colorAccento = ColorDorado,
+                                    colores      = colores,
+                                    onLogout     = {
                                         scope.launch {
                                             authRepository.logout()
                                             navController.navigate(Routes.LOGIN) {
@@ -262,51 +250,79 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ── Placeholder temporal mientras se construyen los dashboards ───────────────
-// Muestra el rol con su color de acento y un botón de logout funcional
-// Se reemplaza en los siguientes bloques con el dashboard real
+// ── Placeholder temporal con diseño adaptado al tema ─────────────────────────
+// Muestra el rol con su color de acento, respeta modo claro/oscuro
+// Se reemplaza con el dashboard real en el siguiente paso
 @Composable
 fun PlaceholderDashboard(
     titulo: String,
     subtitulo: String,
-    colorAccento: androidx.compose.ui.graphics.Color,
+    colorAccento: Color,
+    colores: BarberiaColores,
     onLogout: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ColorFondo),
+            .background(colores.fondo),
         contentAlignment = Alignment.Center
     ) {
-        androidx.compose.foundation.layout.Column(
+        Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(32.dp)
         ) {
-            androidx.compose.material3.Icon(
-                imageVector = Icons.Filled.ContentCut,
-                contentDescription = null,
-                tint = colorAccento,
-                modifier = Modifier.size(56.dp)
-            )
+            // Ícono con fondo del color del rol
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .then(
+                        Modifier.background(
+                            color = colorAccento.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(20.dp)
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector    = Icons.Filled.ContentCut,
+                    contentDescription = null,
+                    tint           = colorAccento,
+                    modifier       = Modifier.size(40.dp)
+                )
+            }
+
             Text(
-                text = "Dashboard $titulo",
-                color = colorAccento,
-                fontSize = 20.sp,
+                text       = "Dashboard $titulo",
+                color      = colorAccento,
+                fontSize   = 20.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = subtitulo,
-                color = ColorTextoSub,
+                text     = subtitulo,
+                color    = colores.textoSub,
                 fontSize = 14.sp
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text     = "En construcción...",
+                color    = colores.textoSub.copy(alpha = 0.5f),
+                fontSize = 12.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             OutlinedButton(
                 onClick = onLogout,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorTextoSub),
-                border = androidx.compose.foundation.BorderStroke(1.dp, ColorBorde)
+                shape   = RoundedCornerShape(12.dp),
+                colors  = ButtonDefaults.outlinedButtonColors(
+                    contentColor = colores.textoSub
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp, colores.borde
+                )
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                    Icons.AutoMirrored.Filled.Logout,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp)
                 )

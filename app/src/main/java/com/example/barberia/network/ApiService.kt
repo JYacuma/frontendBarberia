@@ -94,7 +94,7 @@ interface ApiService {
     suspend fun finalizarCita(@Path("id") id: Long): Response<CitaDTO>
 
     @PATCH("api/citas/{id}/no-presento")
-    suspend fun noPresenroCita(@Path("id") id: Long): Response<CitaDTO>
+    suspend fun noPresento(@Path("id") id: Long): Response<CitaDTO>
 
     // ── HORARIOS ──────────────────────────────────────────────────────────
 

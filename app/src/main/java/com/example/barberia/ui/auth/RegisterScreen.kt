@@ -3,7 +3,9 @@ package com.example.barberia.ui.auth
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.barberia.network.AuthRepository
+import com.example.barberia.ui.theme.*
 import com.example.barberia.viewmodel.AuthViewModel
 
 @Composable
@@ -38,10 +41,12 @@ fun RegisterScreen(
     onRegistroExitoso: (correo: String) -> Unit,
     onVolver: () -> Unit
 ) {
+    // ── Lee el tema actual ────────────────────────────────────────────────
+    val colores = LocalBarberiaColores.current
+
     val viewModel: AuthViewModel = viewModel(
         factory = AuthViewModel.factory(authRepository)
     )
-
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
 
@@ -51,15 +56,11 @@ fun RegisterScreen(
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // Cuando el registro es exitoso vuelve al login con el correo prellenado
     LaunchedEffect(uiState.registerSuccess) {
-        uiState.registerSuccess?.let {
-            onRegistroExitoso(it.correo)
-        }
+        uiState.registerSuccess?.let { onRegistroExitoso(it.correo) }
     }
 
-    // Indicador de pasos: nombre=1, correo=2, contraseña=3
-    // Se activa conforme el usuario llena los campos
+    // Indicadores de progreso — se activan conforme se llenan los campos
     val paso1 = nombre.isNotBlank()
     val paso2 = correo.isNotBlank()
     val paso3 = password.length >= 6
@@ -67,9 +68,9 @@ fun RegisterScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ColorFondo)
+            .background(colores.fondo)   // cambia según el modo
     ) {
-        // Franja decorativa superior con gradiente azul
+        // Franja superior azul (diferencia el registro del login que es rojo)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -87,11 +88,11 @@ fun RegisterScreen(
                 .verticalScroll(rememberScrollState())
         ) {
 
-            // ── Header con botón volver ──────────────────────────────────
+            // ── Header ───────────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ColorSuperficie)
+                    .background(colores.superficie)
             ) {
                 // Borde inferior azul
                 Box(
@@ -106,81 +107,100 @@ fun RegisterScreen(
 
                 Column(
                     modifier = Modifier.padding(
-                        top = 52.dp,
-                        start = 20.dp,
-                        end = 20.dp,
-                        bottom = 20.dp
+                        top = 52.dp, start = 20.dp, end = 20.dp, bottom = 20.dp
                     )
                 ) {
-                    // Botón volver con animación
-                    val interactionSource = remember {
-                        androidx.compose.foundation.interaction.MutableInteractionSource()
-                    }
-                    val isPressed by interactionSource.collectIsPressedAsState()
-                    val escalaVolver by animateFloatAsState(
-                        targetValue = if (isPressed) 0.92f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy
-                        ),
-                        label = "volverScale"
-                    )
-
-                    IconButton(
-                        onClick = onVolver,
-                        interactionSource = interactionSource,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .scale(escalaVolver)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(ColorSuperficie2)
+                    // Fila superior: botón volver + toggle modo
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = ColorTexto,
-                            modifier = Modifier.size(20.dp)
+                        // Botón volver con animación spring
+                        val interSrc = remember { MutableInteractionSource() }
+                        val isPressed by interSrc.collectIsPressedAsState()
+                        val escala by animateFloatAsState(
+                            targetValue = if (isPressed) 0.92f else 1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy),
+                            label = "volverScale"
                         )
+                        IconButton(
+                            onClick = onVolver,
+                            interactionSource = interSrc,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .scale(escala)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(colores.superficie2)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.ArrowBack,
+                                contentDescription = "Volver",
+                                tint = colores.texto,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Botón modo claro/oscuro
+                        IconButton(onClick = {
+                            TemaManager.modoOscuro.value = when (TemaManager.modoOscuro.value) {
+                                null  -> !colores.esModoOscuro  // invierte lo que el sistema tiene
+                                true  -> false                  // oscuro → claro
+                                false -> null                   // claro → sistema
+                            }
+                        }) {
+                            Icon(
+                                imageVector = when (TemaManager.modoOscuro.value) {
+                                    null  -> Icons.Filled.BrightnessMedium
+                                    true  -> Icons.Filled.DarkMode
+                                    false -> Icons.Filled.LightMode
+                                },
+                                contentDescription = "Modo",
+                                tint = colores.textoSub,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
                         text = "Crear cuenta",
-                        color = ColorTexto,
+                        color = colores.texto,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "Completa tus datos para registrarte",
-                        color = ColorTextoSub,
+                        color = colores.textoSub,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(top = 4.dp)
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // ── Barra de progreso de 3 pasos ─────────────────────
-                    // Cada segmento se activa conforme el usuario llena el campo
+                    // Barra de 3 pasos — cada segmento se activa al llenar el campo
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         listOf(paso1, paso2, paso3).forEachIndexed { index, activo ->
-                            val colorSegmento by animateColorAsState(
+                            val colorSeg by animateColorAsState(
                                 targetValue = when {
-                                    activo -> ColorAzul
+                                    activo   -> ColorAzul
                                     index == 0 -> ColorAzul.copy(alpha = 0.3f)
-                                    else -> ColorBorde
+                                    else     -> colores.borde
                                 },
                                 animationSpec = tween(300),
-                                label = "stepColor$index"
+                                label = "step$index"
                             )
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(4.dp)
                                     .clip(RoundedCornerShape(2.dp))
-                                    .background(colorSegmento)
+                                    .background(colorSeg)
                             )
                         }
                     }
@@ -195,16 +215,17 @@ fun RegisterScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
-                // Campo Nombre
+                // Nombre
                 Column {
-                    LabelCampo(texto = "Nombre completo", completado = paso1)
+                    LabelCampo("Nombre completo", paso1)
                     Spacer(modifier = Modifier.height(6.dp))
                     BarberiaTextField(
-                        value = nombre,
+                        value         = nombre,
                         onValueChange = { nombre = it; viewModel.clearError() },
-                        label = "Tu nombre completo",
-                        leadingIcon = Icons.Filled.Person,
-                        accentColor = ColorAzul,
+                        label         = "Tu nombre completo",
+                        leadingIcon   = Icons.Filled.Person,
+                        accentColor   = ColorAzul,
+                        colores       = colores,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
@@ -212,19 +233,20 @@ fun RegisterScreen(
                     )
                 }
 
-                // Campo Correo
+                // Correo
                 Column {
-                    LabelCampo(texto = "Correo electrónico", completado = paso2)
+                    LabelCampo("Correo electrónico", paso2)
                     Spacer(modifier = Modifier.height(6.dp))
                     BarberiaTextField(
-                        value = correo,
+                        value         = correo,
                         onValueChange = { correo = it; viewModel.clearError() },
-                        label = "tu@correo.com",
-                        leadingIcon = Icons.Filled.Email,
-                        accentColor = ColorAzul,
+                        label         = "tu@correo.com",
+                        leadingIcon   = Icons.Filled.Email,
+                        accentColor   = ColorAzul,
+                        colores       = colores,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next
+                            imeAction    = ImeAction.Next
                         ),
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
@@ -232,32 +254,33 @@ fun RegisterScreen(
                     )
                 }
 
-                // Campo Contraseña
+                // Contraseña
                 Column {
-                    LabelCampo(texto = "Contraseña (mín. 6 caracteres)", completado = paso3)
+                    LabelCampo("Contraseña (mín. 6 caracteres)", paso3)
                     Spacer(modifier = Modifier.height(6.dp))
                     BarberiaTextField(
-                        value = password,
-                        onValueChange = { password = it; viewModel.clearError() },
-                        label = "Contraseña",
-                        leadingIcon = Icons.Filled.Lock,
-                        accentColor = ColorAzul,
-                        isPassword = true,
+                        value           = password,
+                        onValueChange   = { password = it; viewModel.clearError() },
+                        label           = "Contraseña",
+                        leadingIcon     = Icons.Filled.Lock,
+                        accentColor     = ColorAzul,
+                        colores         = colores,
+                        isPassword      = true,
                         passwordVisible = passwordVisible,
                         onPasswordToggle = { passwordVisible = !passwordVisible },
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Next
+                            imeAction    = ImeAction.Next
                         ),
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         )
                     )
 
-                    // Indicador visual de fuerza de contraseña
+                    // Indicador de fuerza de contraseña
                     AnimatedVisibility(visible = password.isNotBlank()) {
                         val fuerzaColor = when {
-                            password.length >= 10 -> Color(0xFF3CB86A)
+                            password.length >= 10 -> ColorVerde
                             password.length >= 6  -> ColorAzulClaro
                             else                  -> ColorError
                         }
@@ -277,33 +300,31 @@ fun RegisterScreen(
                                     .clip(RoundedCornerShape(50))
                                     .background(fuerzaColor)
                             )
-                            Text(
-                                text = fuerzaTexto,
-                                color = fuerzaColor,
-                                fontSize = 11.sp
-                            )
+                            Text(fuerzaTexto, color = fuerzaColor, fontSize = 11.sp)
                         }
                     }
                 }
 
-                // Campo Confirmar Contraseña
+                // Confirmar contraseña
                 Column {
-                    val coinciden = confirmPassword.isNotBlank() && confirmPassword == password
-                    LabelCampo(texto = "Confirmar contraseña", completado = coinciden)
+                    val coinciden = confirmPassword.isNotBlank() &&
+                            confirmPassword == password
+                    LabelCampo("Confirmar contraseña", coinciden)
                     Spacer(modifier = Modifier.height(6.dp))
                     BarberiaTextField(
-                        value = confirmPassword,
-                        onValueChange = { confirmPassword = it; viewModel.clearError() },
-                        label = "Repite tu contraseña",
-                        leadingIcon = Icons.Filled.LockOpen,
-                        accentColor = if (confirmPassword.isNotBlank() && confirmPassword != password)
-                            ColorError else ColorAzul,
-                        isPassword = true,
+                        value           = confirmPassword,
+                        onValueChange   = { confirmPassword = it; viewModel.clearError() },
+                        label           = "Repite tu contraseña",
+                        leadingIcon     = Icons.Filled.LockOpen,
+                        accentColor     = if (confirmPassword.isNotBlank() &&
+                            confirmPassword != password) ColorError else ColorAzul,
+                        colores         = colores,
+                        isPassword      = true,
                         passwordVisible = passwordVisible,
                         onPasswordToggle = { passwordVisible = !passwordVisible },
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
+                            imeAction    = ImeAction.Done
                         ),
                         keyboardActions = KeyboardActions(
                             onDone = {
@@ -313,7 +334,6 @@ fun RegisterScreen(
                         )
                     )
 
-                    // Aviso si las contraseñas no coinciden
                     AnimatedVisibility(
                         visible = confirmPassword.isNotBlank() && confirmPassword != password
                     ) {
@@ -326,14 +346,14 @@ fun RegisterScreen(
                     }
                 }
 
-                // Mensaje de error del backend
+                // Error del backend
                 AnimatedVisibility(
                     visible = uiState.errorMessage != null,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
+                    enter   = fadeIn() + expandVertically(),
+                    exit    = fadeOut() + shrinkVertically()
                 ) {
                     Card(
-                        shape = RoundedCornerShape(10.dp),
+                        shape  = RoundedCornerShape(10.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = ColorError.copy(alpha = 0.1f)
                         )
@@ -343,27 +363,25 @@ fun RegisterScreen(
                             color = ColorError,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp)
+                            modifier = Modifier.fillMaxWidth().padding(12.dp)
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Botón Crear cuenta — azul, activado solo cuando los datos son válidos
                 val formListo = nombre.isNotBlank() &&
                         correo.isNotBlank() &&
                         password.length >= 6 &&
                         password == confirmPassword
 
+                // Botón crear cuenta — azul cuando listo, gris cuando no
                 BarberiaBoton(
-                    texto = "Crear cuenta",
-                    icono = Icons.Filled.PersonAdd,
-                    isLoading = uiState.isLoading,
-                    colorFondo = if (formListo) ColorAzul else ColorBorde,
-                    onClick = {
+                    texto      = "Crear cuenta",
+                    icono      = Icons.Filled.PersonAdd,
+                    isLoading  = uiState.isLoading,
+                    colorFondo = if (formListo) ColorAzul else colores.borde,
+                    onClick    = {
                         if (formListo) {
                             focusManager.clearFocus()
                             viewModel.register(nombre, correo, password, confirmPassword)
@@ -373,13 +391,11 @@ fun RegisterScreen(
 
                 Text(
                     text = "Al registrarte aceptas nuestros términos de uso.\nTu cuenta será de tipo CLIENTE.",
-                    color = ColorTextoSub,
+                    color = colores.textoSub,
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center,
                     lineHeight = 16.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -388,29 +404,30 @@ fun RegisterScreen(
     }
 }
 
-// Label de campo con check animado cuando el campo está completo
+// Label de campo con check verde animado cuando está completo
 @Composable
 private fun LabelCampo(texto: String, completado: Boolean) {
+    val colores = LocalBarberiaColores.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
             text = texto,
-            color = ColorTextoSub,
+            color = colores.textoSub,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             letterSpacing = 0.5.sp
         )
         AnimatedVisibility(
             visible = completado,
-            enter = fadeIn() + scaleIn(),
-            exit = fadeOut() + scaleOut()
+            enter   = fadeIn() + scaleIn(),
+            exit    = fadeOut() + scaleOut()
         ) {
             Icon(
                 imageVector = Icons.Filled.CheckCircle,
                 contentDescription = null,
-                tint = Color(0xFF3CB86A),
+                tint = ColorVerde,
                 modifier = Modifier.size(14.dp)
             )
         }

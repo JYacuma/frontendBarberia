@@ -7,19 +7,20 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-// Crea el DataStore una sola vez a nivel de app
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "session")
 
 class SessionManager(private val context: Context) {
 
     companion object {
-        val KEY_TOKEN  = stringPreferencesKey("token")
-        val KEY_ROL    = stringPreferencesKey("rol")
-        val KEY_ID     = longPreferencesKey("id_usuario")
-        val KEY_NOMBRE = stringPreferencesKey("nombre")
-        val KEY_CORREO = stringPreferencesKey("correo")
+        val KEY_TOKEN     = stringPreferencesKey("token")
+        val KEY_ROL       = stringPreferencesKey("rol")
+        val KEY_ID        = longPreferencesKey("id_usuario")
+        val KEY_NOMBRE    = stringPreferencesKey("nombre")
+        val KEY_CORREO    = stringPreferencesKey("correo")
+        // idBarbero real de la tabla barbero — diferente al idUsuario
+        // Solo se guarda cuando el rol es BARBERO
+        val KEY_ID_BARBERO = longPreferencesKey("id_barbero")
 
-        // Instancia única — reemplaza Hilt de forma simple
         @Volatile
         private var INSTANCE: SessionManager? = null
 
@@ -30,7 +31,7 @@ class SessionManager(private val context: Context) {
         }
     }
 
-    // Guarda toda la sesión después del login
+    // Guarda la sesión completa después del login
     suspend fun guardarSesion(
         token: String,
         id: Long,
@@ -47,18 +48,27 @@ class SessionManager(private val context: Context) {
         }
     }
 
-    // Flujos reactivos — la UI los observa y se actualiza automáticamente
-    val token: Flow<String?> = context.dataStore.data.map { it[KEY_TOKEN] }
-    val rol: Flow<String?>   = context.dataStore.data.map { it[KEY_ROL] }
-    val id: Flow<Long?>      = context.dataStore.data.map { it[KEY_ID] }
-    val nombre: Flow<String?> = context.dataStore.data.map { it[KEY_NOMBRE] }
+    // Guarda el idBarbero real después de buscarlo por idUsuario
+    // Se llama desde AuthRepository justo después del login de un BARBERO
+    suspend fun guardarIdBarbero(idBarbero: Long) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_ID_BARBERO] = idBarbero
+        }
+    }
 
-    // Borra todo al cerrar sesión
+    // Flujos reactivos — la UI los observa
+    val token: Flow<String?>  = context.dataStore.data.map { it[KEY_TOKEN] }
+    val rol: Flow<String?>    = context.dataStore.data.map { it[KEY_ROL] }
+    val id: Flow<Long?>       = context.dataStore.data.map { it[KEY_ID] }
+    val nombre: Flow<String?> = context.dataStore.data.map { it[KEY_NOMBRE] }
+    // 0L = no encontrado aún, se resuelve después del login
+    val idBarbero: Flow<Long?> = context.dataStore.data.map { it[KEY_ID_BARBERO] }
+
+    // Borra todo al cerrar sesión — incluyendo el idBarbero
     suspend fun cerrarSesion() {
         context.dataStore.edit { it.clear() }
     }
 
-    // Lectura rápida no reactiva — usada en RetrofitClient para el token
     suspend fun getToken(): String? {
         var result: String? = null
         context.dataStore.data.collect {

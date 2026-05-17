@@ -32,6 +32,7 @@ import com.example.barberia.ui.auth.LoginScreen
 import com.example.barberia.ui.auth.RegisterScreen
 import com.example.barberia.ui.screens.AdminScreen
 import com.example.barberia.ui.screens.BarberoScreen
+import com.example.barberia.ui.screens.SuperAdminScreen
 import com.example.barberia.ui.theme.*
 import com.example.barberia.utils.SessionManager
 import kotlinx.coroutines.flow.firstOrNull
@@ -227,12 +228,10 @@ class MainActivity : ComponentActivity() {
                                 val nombre by sessionManager.nombre
                                     .collectAsStateWithLifecycle(initialValue = "SuperAdmin")
 
-                                PlaceholderDashboard(
-                                    titulo       = "SuperAdmin",
-                                    subtitulo    = nombre ?: "Admin Barbería",
-                                    colorAccento = ColorDorado,
-                                    colores      = colores,
-                                    onLogout     = {
+                                SuperAdminScreen(
+                                    apiService = RetrofitClient.apiService,
+                                    nombre     = nombre ?: "Admin Barbería",
+                                    onLogout   = {
                                         scope.launch {
                                             authRepository.logout()
                                             navController.navigate(Routes.LOGIN) {

@@ -143,6 +143,9 @@ interface ApiService {
     @GET("api/usuarios")
     suspend fun getUsuarios(): Response<List<UsuarioDTO>>
 
+    @POST("api/usuarios")
+    suspend fun createUsuario(@Body dto: UsuarioDTO): Response<UsuarioDTO>
+
     @GET("api/usuarios/{id}")
     suspend fun getUsuarioById(@Path("id") id: Long): Response<UsuarioDTO>
 

@@ -194,7 +194,7 @@ private fun SuperInicioTab(
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Filled.Crown, null,
+                                Icon(Icons.Filled.AdminPanelSettings, null,
                                     tint = SuperAccent,
                                     modifier = Modifier.size(14.dp))
                                 Text("SUPERADMIN", color = SuperAccent,
@@ -213,7 +213,7 @@ private fun SuperInicioTab(
                                 .background(SuperAccentSoft)
                                 .border(1.5.dp, SuperAccent, CircleShape),
                                 contentAlignment = Alignment.Center) {
-                                Icon(Icons.Filled.Crown, null,
+                                Icon(Icons.Filled.AdminPanelSettings, null,
                                     tint = SuperAccent,
                                     modifier = Modifier.size(22.dp))
                             }

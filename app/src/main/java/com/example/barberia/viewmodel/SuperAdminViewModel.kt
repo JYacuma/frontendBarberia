@@ -90,7 +90,7 @@ class SuperAdminViewModel(
                         nombre    = nombre,
                         correo    = correo,
                         telefono  = null,
-                        password  = password,
+                        password  = password,  // ⭐ AHORA SÍ FUNCIONA
                         rol       = rol,
                         activo    = true
                     )

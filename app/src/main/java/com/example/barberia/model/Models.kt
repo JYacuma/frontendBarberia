@@ -37,10 +37,10 @@ data class UsuarioDTO(
     val nombre: String,
     val correo: String,
     val telefono: String? = null,
+    val password: String? = null,  // SE AGREGO ESTA LÍNEA
     val rol: RolEnum,
     val activo: Boolean? = true
 )
-
 // ── BARBERO ────────────────────────────────────────────────────────────────
 
 data class BarberoDTO(

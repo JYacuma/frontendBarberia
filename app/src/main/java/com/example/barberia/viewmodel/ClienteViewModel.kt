@@ -9,14 +9,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-// Estado completo de la pantalla del cliente
-// La UI observa este objeto y se redibuja automáticamente cuando cambia
+
 data class ClienteUiState(
     val isLoading: Boolean = false,
     val barberos: List<BarberoDTO> = emptyList(),
     val servicios: List<ServicioDTO> = emptyList(),
     val citas: List<CitaDTO> = emptyList(),
     val horasDisponibles: List<String> = emptyList(),
+    val perfil: UsuarioDTO? = null,
+    val isLoadingPerfil: Boolean = false,
     val errorMessage: String? = null,
     val successMessage: String? = null
 )
@@ -29,13 +30,8 @@ class ClienteViewModel(
     private val _uiState = MutableStateFlow(ClienteUiState())
     val uiState: StateFlow<ClienteUiState> = _uiState
 
-    // Al crear el ViewModel carga todo inmediatamente
-    init {
-        cargarDatosIniciales()
-    }
+    init { cargarDatosIniciales() }
 
-    // Carga barberos activos, servicios y citas del cliente en paralelo
-    // Se llama al arrancar y después de agendar/cancelar para refrescar
     fun cargarDatosIniciales() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
@@ -43,24 +39,64 @@ class ClienteViewModel(
                 val barberos  = apiService.getBarberosActivos()
                 val servicios = apiService.getServicios()
                 val citas     = apiService.getCitasByUsuario(idUsuario)
+                val perfil    = apiService.getUsuarioById(idUsuario)
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    barberos  = if (barberos.isSuccessful)  barberos.body()  ?: emptyList() else emptyList(),
-                    servicios = if (servicios.isSuccessful) servicios.body() ?: emptyList() else emptyList(),
-                    citas     = if (citas.isSuccessful)     citas.body()     ?: emptyList() else emptyList()
+                    barberos  = if (barberos.isSuccessful)
+                        barberos.body() ?: emptyList() else emptyList(),
+                    servicios = if (servicios.isSuccessful)
+                        servicios.body() ?: emptyList() else emptyList(),
+                    citas     = if (citas.isSuccessful)
+                        citas.body() ?: emptyList() else emptyList(),
+                    perfil    = if (perfil.isSuccessful) perfil.body() else null
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    isLoading = false,
+                    isLoading    = false,
                     errorMessage = "Sin conexión. Verifica tu internet."
                 )
             }
         }
     }
 
-    // Consulta las horas disponibles para un barbero en una fecha
-    // Se llama cuando el usuario selecciona barbero + fecha en la tab Agendar
+    // PUT /api/usuarios/{id} — actualiza nombre y teléfono
+    // El correo no se edita por seguridad
+    fun actualizarPerfil(nombre: String, telefono: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingPerfil = true)
+            try {
+                val perfilActual = _uiState.value.perfil ?: return@launch
+                val actualizado  = perfilActual.copy(
+                    nombre   = nombre.ifBlank { perfilActual.nombre ?: "" },
+                    telefono = telefono.ifBlank { null }
+                )
+                val response = apiService.updateUsuario(idUsuario, actualizado)
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingPerfil = false,
+                        perfil          = response.body(),
+                        successMessage  = "Perfil actualizado correctamente"
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingPerfil = false,
+                        errorMessage    = when (response.code()) {
+                            400  -> "Datos inválidos"
+                            409  -> "El teléfono ya está en uso"
+                            else -> "Error al actualizar (${response.code()})"
+                        }
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoadingPerfil = false,
+                    errorMessage    = "Sin conexión."
+                )
+            }
+        }
+    }
+
     fun cargarDisponibilidad(idBarbero: Long, fecha: String) {
         viewModelScope.launch {
             try {
@@ -68,11 +104,6 @@ class ClienteViewModel(
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
                         horasDisponibles = response.body() ?: emptyList()
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        horasDisponibles = emptyList(),
-                        errorMessage = "No se pudo cargar disponibilidad"
                     )
                 }
             } catch (e: Exception) {
@@ -83,12 +114,10 @@ class ClienteViewModel(
         }
     }
 
-    // Limpia las horas disponibles cuando el usuario cambia de barbero o fecha
     fun limpiarDisponibilidad() {
         _uiState.value = _uiState.value.copy(horasDisponibles = emptyList())
     }
 
-    // POST /api/citas — crea la cita y recarga la lista
     fun agendarCita(idBarbero: Long, idServicio: Long, fecha: String, horaInicio: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
@@ -105,58 +134,41 @@ class ClienteViewModel(
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
                         isLoading      = false,
-                        successMessage = "¡Cita agendada exitosamente!",
-                        horasDisponibles = emptyList()
+                        successMessage = "¡Cita agendada exitosamente!"
                     )
-                    cargarDatosIniciales() // refresca la lista de citas
+                    cargarDatosIniciales()
                 } else {
                     _uiState.value = _uiState.value.copy(
-                        isLoading = false,
+                        isLoading    = false,
                         errorMessage = when (response.code()) {
                             400  -> "Horario no disponible, elige otro"
-                            403  -> "No tienes permiso para agendar"
                             else -> "Error al agendar (${response.code()})"
                         }
                     )
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    isLoading    = false,
-                    errorMessage = "Sin conexión."
-                )
+                    isLoading = false, errorMessage = "Sin conexión.")
             }
         }
     }
 
-    // PATCH /api/citas/{id}/cancelar — cancela una cita PENDIENTE
     fun cancelarCita(idCita: Long) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val response = apiService.cancelarCita(idCita)
                 if (response.isSuccessful) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading      = false,
-                        successMessage = "Cita cancelada correctamente"
-                    )
+                    _uiState.value = _uiState.value.copy(successMessage = "Cita cancelada")
                     cargarDatosIniciales()
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading    = false,
-                        errorMessage = "Error al cancelar la cita"
-                    )
+                    _uiState.value = _uiState.value.copy(errorMessage = "Error al cancelar")
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading    = false,
-                    errorMessage = "Sin conexión."
-                )
+                _uiState.value = _uiState.value.copy(errorMessage = "Error al cancelar")
             }
         }
     }
 
-    // POST /api/resenas — envía reseña para una cita FINALIZADA
-    // calificacion: 1 a 5 estrellas
     fun enviarResena(idCita: Long, idBarbero: Long, calificacion: Int, comentario: String) {
         viewModelScope.launch {
             try {
@@ -170,32 +182,21 @@ class ClienteViewModel(
                     )
                 )
                 if (response.isSuccessful) {
-                    _uiState.value = _uiState.value.copy(
-                        successMessage = "¡Reseña enviada! Gracias."
-                    )
+                    _uiState.value = _uiState.value.copy(successMessage = "¡Reseña enviada!")
                 } else {
                     _uiState.value = _uiState.value.copy(
-                        errorMessage = "Error al enviar reseña"
-                    )
+                        errorMessage = "Error al enviar reseña (${response.code()})")
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = "Sin conexión."
-                )
+                _uiState.value = _uiState.value.copy(errorMessage = "Error al enviar reseña")
             }
         }
     }
 
-    // Limpia mensajes de éxito/error después de mostrarlos en el Snackbar
     fun clearMessages() {
-        _uiState.value = _uiState.value.copy(
-            errorMessage   = null,
-            successMessage = null
-        )
+        _uiState.value = _uiState.value.copy(errorMessage = null, successMessage = null)
     }
 
-    // Factory — le dice a Android cómo crear este ViewModel con sus dependencias
-    // sin necesitar Hilt
     companion object {
         fun factory(apiService: ApiService, idUsuario: Long): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {

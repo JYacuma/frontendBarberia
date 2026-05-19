@@ -5,8 +5,8 @@ import com.example.barberia.model.LoginResponse
 import com.example.barberia.model.RegisterRequest
 import com.example.barberia.model.RegisterResponse
 import com.example.barberia.utils.SessionManager
+import com.example.barberia.model.*
 
-// Resultado genérico para cualquier llamada al backend
 
 sealed class Result<out T> {
     data class Success<T>(val data: T) : Result<T>()
@@ -19,14 +19,11 @@ class AuthRepository(
     private val sessionManager: SessionManager
 ) {
 
-    // POST /api/auth/login
-    // Si el backend responde 200 guarda el token en disco automáticamente
     suspend fun login(email: String, password: String): Result<LoginResponse> {
         return try {
             val response = apiService.login(LoginRequest(email, password))
             if (response.isSuccessful) {
                 val body = response.body()!!
-                // Guarda JWT + datos del usuario en DataStore
                 sessionManager.guardarSesion(
                     token  = body.token,
                     id     = body.idUsuario,
@@ -34,6 +31,25 @@ class AuthRepository(
                     correo = body.correo,
                     rol    = body.rol.name
                 )
+
+                // Si el rol es BARBERO, buscamos el idBarbero real en la tabla barbero
+                // filtrando por idUsuario — así BarberoScreen usa el id correcto
+                if (body.rol == RolEnum.BARBERO) {
+                    try {
+                        val barberos = apiService.getBarberos()
+                        if (barberos.isSuccessful) {
+                            val barbero = barberos.body()
+                                ?.firstOrNull { it.idUsuario == body.idUsuario }
+                            if (barbero?.idBarbero != null) {
+                                sessionManager.guardarIdBarbero(barbero.idBarbero)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Si falla la búsqueda del barbero no bloqueamos el login
+                        // BarberoScreen mostrará un error al cargar sus datos
+                    }
+                }
+
                 Result.Success(body)
             } else {
                 Result.Error(
@@ -46,12 +62,10 @@ class AuthRepository(
                 )
             }
         } catch (e: Exception) {
-            // Sin internet, timeout de Render, etc.
             Result.Error("Sin conexión. Verifica tu internet e intenta de nuevo.")
         }
     }
 
-    // POST /api/auth/register
     suspend fun register(
         nombre: String,
         correoOTelefono: String,
@@ -77,7 +91,6 @@ class AuthRepository(
         }
     }
 
-    // Borra el token y datos del disco
     suspend fun logout() {
         sessionManager.cerrarSesion()
     }

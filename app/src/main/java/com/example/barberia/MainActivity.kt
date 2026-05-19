@@ -184,12 +184,13 @@ class MainActivity : ComponentActivity() {
                                     .collectAsStateWithLifecycle(initialValue = "Barbero")
                                 val idUsuario by sessionManager.id
                                     .collectAsStateWithLifecycle(initialValue = 0L)
+                                // idBarbero real guardado en el login — ya no es temporal
+                                val idBarbero by sessionManager.idBarbero
+                                    .collectAsStateWithLifecycle(initialValue = 0L)
 
-                                // idBarbero se obtiene del backend — por ahora usa idUsuario como temporal
-                                // En el siguiente paso lo resolvemos correctamente
                                 BarberoScreen(
                                     apiService = RetrofitClient.apiService,
-                                    idBarbero  = idUsuario ?: 1L,   // ← temporal
+                                    idBarbero  = idBarbero ?: 0L,
                                     idUsuario  = idUsuario ?: 0L,
                                     nombre     = nombre ?: "Barbero",
                                     onLogout   = {

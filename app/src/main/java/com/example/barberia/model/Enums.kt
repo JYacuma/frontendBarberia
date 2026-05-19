@@ -9,7 +9,9 @@ enum class EstadoCitaEnum {
 }
 
 enum class DiaSemanaEnum {
-    LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO
+    LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO;
+
+
 }
 
 enum class TipoNotificacionEnum {

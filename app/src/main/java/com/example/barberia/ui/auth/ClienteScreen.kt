@@ -60,12 +60,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 
 
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ClienteScreen(
     apiService: ApiService,
     idUsuario: Long,
     nombre: String,
+    navController: androidx.navigation.NavController,
     onLogout: () -> Unit
 ) {
     val colores       = LocalBarberiaColores.current
@@ -146,7 +148,26 @@ fun ClienteScreen(
             userScrollEnabled = true
         ) { pagina ->
             when (pagina) {
-                0 -> InicioTab(nombre, uiState, onLogout, colores, sistemaOscuro)
+                0 -> InicioTab(
+                    nombre        = nombre,
+                    uiState       = uiState,
+                    onLogout      = onLogout,
+                    colores       = colores,
+                    sistemaOscuro = sistemaOscuro,
+                    // 👈 PEGA EL CÓDIGO DE TU GUÍA AQUÍ COMO PARÁMETROS:
+                    onBarberoClick = { barbero ->
+                        navController.navigate("barbero_detalle/${barbero.idBarbero}")
+                    },
+
+                    onServicioClick = { servicio ->
+                        val desc = servicio.descripcion?.replace(" ", "_") ?: "null"
+                        navController.navigate(
+                            "servicio_detalle/${servicio.idServicio}/" +
+                                    "${servicio.nombre}/${servicio.precio}/" +
+                                    "${servicio.duracionMinutos}/$desc"
+                        )
+                    }
+                )
                 1 -> AgendarTab(uiState, viewModel, colores)
                 2 -> MisCitasTab(uiState, viewModel, colores)
                 3 -> PerfilTab(uiState, viewModel, onLogout, colores, sistemaOscuro)
@@ -164,7 +185,9 @@ private fun InicioTab(
     uiState: com.example.barberia.viewmodel.ClienteUiState,
     onLogout: () -> Unit,
     colores: BarberiaColores,
-    sistemaOscuro: Boolean
+    sistemaOscuro: Boolean,
+    onBarberoClick: (BarberoDTO) -> Unit,
+    onServicioClick: (ServicioDTO) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(colores.fondo)
@@ -282,7 +305,9 @@ private fun InicioTab(
                     contentPadding = PaddingValues(horizontal = 20.dp)
                 ) {
                     items(uiState.barberos) { barbero ->
-                        TarjetaBarberoCliente(barbero, colores)
+                        Box(modifier = Modifier.clickable { onBarberoClick(barbero) }) {
+                            TarjetaBarberoCliente(barbero, colores)
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
@@ -296,7 +321,11 @@ private fun InicioTab(
             }
 
             items(uiState.servicios) { servicio ->
-                Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 20.dp, vertical = 4.dp)
+                        .clickable { onServicioClick(servicio) }
+                ) {
                     TarjetaServicioCliente(servicio, colores)
                 }
             }

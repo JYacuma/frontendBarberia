@@ -23,7 +23,10 @@ import com.example.barberia.ui.auth.ClienteScreen
 import com.example.barberia.ui.auth.LoginScreen
 import com.example.barberia.ui.auth.RegisterScreen
 import com.example.barberia.ui.screens.AdminScreen
+import com.example.barberia.ui.screens.BarberoDetalleScreen
 import com.example.barberia.ui.screens.BarberoScreen
+import com.example.barberia.ui.screens.PerfilScreen
+import com.example.barberia.ui.screens.ServicioDetalleScreen
 import com.example.barberia.ui.screens.SuperAdminScreen
 import com.example.barberia.ui.theme.*
 import com.example.barberia.utils.SessionManager
@@ -133,6 +136,33 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            // ── Detalle Barbero ───────────────────────────────────────
+                            composable("barbero_detalle/{idBarbero}") { backStackEntry ->
+                                val idBarbero = backStackEntry.arguments?.getString("idBarbero")?.toLongOrNull() ?: 0L
+                                // Nota: Asegúrate de tener creada la pantalla BarberoDetalleScreen
+                                BarberoDetalleScreen(
+                                    apiService = RetrofitClient.apiService,
+                                    idBarbero  = idBarbero,
+                                    onVolver   = { navController.popBackStack() }
+                                )
+                            }
+
+                            // ── Detalle Servicio ──────────────────────────────────────
+                            composable("servicio_detalle/{idServicio}/{nombre}/{precio}/{duracion}/{descripcion}") { backStackEntry ->
+                                val args = backStackEntry.arguments
+                                // Nota: Asegúrate de tener creada la pantalla ServicioDetalleScreen
+                                ServicioDetalleScreen(
+                                    servicio = com.example.barberia.model.ServicioDTO(
+                                        idServicio      = args?.getString("idServicio")?.toLongOrNull(),
+                                        nombre          = args?.getString("nombre") ?: "",
+                                        precio          = args?.getString("precio")?.toDoubleOrNull() ?: 0.0,
+                                        duracionMinutos = args?.getString("duracion")?.toIntOrNull() ?: 0,
+                                        descripcion     = args?.getString("descripcion")?.replace("_", " ")?.takeIf { it != "null" }
+                                    ),
+                                    onVolver = { navController.popBackStack() }
+                                )
+                            }
+
                             // ── Cliente ───────────────────────────────────
                             composable(Routes.CLIENTE_HOME) {
                                 val idUsuario by sessionManager.id
@@ -144,6 +174,7 @@ class MainActivity : ComponentActivity() {
                                     apiService = RetrofitClient.apiService,
                                     idUsuario  = idUsuario ?: 0L,
                                     nombre     = nombre ?: "Cliente",
+                                    navController = navController,
                                     onLogout   = {
                                         scope.launch {
                                             authRepository.logout()
@@ -209,6 +240,24 @@ class MainActivity : ComponentActivity() {
                                 SuperAdminScreen(
                                     apiService = RetrofitClient.apiService,
                                     nombre     = nombre ?: "Admin Barbería",
+                                    onLogout   = {
+                                        scope.launch {
+                                            authRepository.logout()
+                                            navController.navigate(Routes.LOGIN) {
+                                                popUpTo(0) { inclusive = true }
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+
+                            composable("perfil/{idUsuario}") { backStackEntry ->
+                                val idUsuario = backStackEntry.arguments
+                                    ?.getString("idUsuario")?.toLongOrNull() ?: 0L
+                                PerfilScreen(
+                                    apiService = RetrofitClient.apiService,
+                                    idUsuario  = idUsuario,
+                                    onVolver   = { navController.popBackStack() },
                                     onLogout   = {
                                         scope.launch {
                                             authRepository.logout()

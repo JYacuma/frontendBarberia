@@ -358,7 +358,6 @@ private fun InicioTab(
                                                     texto = "Agendar",
                                                     colorFondo = ColorRojo,
                                                     onClick = {
-                                                        barberoSeleccionado = barbero
                                                         barberoExpandido = null
                                                         scope.launch { pagerState.animateScrollToPage(1) }
                                                     }

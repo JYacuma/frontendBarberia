@@ -100,15 +100,13 @@ fun BarberoScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            BarberoHeader(nombre, uiState.notificacionesCount, colores, onLogout, onNavigateToNotificaciones)
-
             HorizontalPager(
                 state             = pagerState,
                 modifier          = Modifier.weight(1f),
                 userScrollEnabled = true
             ) { pagina ->
                 when (pagina) {
-                    0 -> HoyTab(nombre, uiState, viewModel, colores)
+                    0 -> HoyTab(nombre, uiState, viewModel, colores, onLogout, onNavigateToNotificaciones)
                     1 -> AgendaTab(uiState, viewModel, colores)
                     2 -> ResenasBarberoTab(uiState, colores)
                     3 -> HorariosBarberoTab(uiState, colores)
@@ -262,7 +260,9 @@ private fun HoyTab(
     nombre: String,
     uiState: com.example.barberia.viewmodel.BarberoUiState,
     viewModel: BarberoViewModel,
-    colores: BarberiaColores
+    colores: BarberiaColores,
+    onLogout: () -> Unit,
+    onNavigateToNotificaciones: () -> Unit = {}
 ) {
     var filtroEstado by remember { mutableStateOf<EstadoCitaEnum?>(null) }
     var citaAccion     by remember { mutableStateOf<CitaDTO?>(null) }
@@ -283,6 +283,71 @@ private fun HoyTab(
         LazyColumn(
             modifier = Modifier.fillMaxSize().background(colores.fondo)
         ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(44.dp).clip(CircleShape).background(ColorAzul),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = getInitials(nombre),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                        Column {
+                            Text(nombre, color = colores.texto, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("Barbero", color = ColorAzul, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Box {
+                            BotonIconoBarbero(Icons.Filled.Notifications, colores.textoSub, onClick = onNavigateToNotificaciones)
+                            if (uiState.notificacionesCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 4.dp, y = (-4).dp)
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .background(ColorError),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (uiState.notificacionesCount > 99) "99+" else uiState.notificacionesCount.toString(),
+                                        color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        IconButton(onClick = { TemaManager.toggleModo() }) {
+                            Icon(
+                                imageVector = when (TemaManager.modoOscuro.value) {
+                                    null  -> Icons.Filled.BrightnessMedium
+                                    true  -> Icons.Filled.DarkMode
+                                    false -> Icons.Filled.LightMode
+                                },
+                                contentDescription = "Modo",
+                                tint = colores.textoSub,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        BotonIconoBarbero(Icons.AutoMirrored.Filled.Logout, colores.textoSub, onLogout)
+                    }
+                }
+            }
             item {
                 Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically,
@@ -458,17 +523,17 @@ private fun HoyTab(
     citaDetalle?.let { detalle ->
         AlertDialog(
             onDismissRequest = { citaDetalle = null },
-            containerColor   = colores.superficie,
-            shape            = RoundedCornerShape(20.dp),
+            containerColor = colores.superficie,
+            shape = RoundedCornerShape(20.dp),
             title = {
-                Text("Detalle de cita", color = colores.texto, fontWeight = FontWeight.Bold)
+                Text("Cita #${detalle.cita.idCita}", color = colores.texto, fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilaDetalle("Fecha", detalle.cita.fecha ?: "--", colores)
-                    FilaDetalle("Hora", "${detalle.cita.horaInicio?.take(5) ?: "--:--"} - ${detalle.cita.horaFin?.take(5) ?: "--:--"}", colores)
+                    FilaDetalle("Hora Inicio", detalle.cita.horaInicio?.take(5) ?: "--:--", colores)
+                    FilaDetalle("Hora Fin", detalle.cita.horaFin?.take(5) ?: "--:--", colores)
                     FilaDetalle("Cliente", detalle.clienteNombre, colores)
-                    FilaDetalle("Barbero", detalle.barberoNombre, colores)
                     FilaDetalle("Servicio", detalle.servicioNombre, colores)
                     val estadoTxt = when (detalle.cita.estado) {
                         EstadoCitaEnum.PENDIENTE -> "Pendiente"
@@ -482,8 +547,33 @@ private fun HoyTab(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { citaDetalle = null }) {
-                    Text("Cerrar", color = ColorAzul)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = { citaDetalle = null }) {
+                        Text("Cerrar", color = ColorAzul)
+                    }
+                    when (detalle.cita.estado) {
+                        EstadoCitaEnum.PENDIENTE -> {
+                            TextButton(onClick = { viewModel.iniciarCita(detalle.cita.idCita!!); citaDetalle = null }) {
+                                Text("Iniciar", color = ColorVerde)
+                            }
+                            TextButton(onClick = { viewModel.cancelarCita(detalle.cita.idCita!!); citaDetalle = null }) {
+                                Text("Cancelar", color = ColorError)
+                            }
+                        }
+                        EstadoCitaEnum.EN_CURSO -> {
+                            TextButton(onClick = { viewModel.finalizarCita(detalle.cita.idCita!!); citaDetalle = null }) {
+                                Text("Finalizar", color = ColorVerde)
+                            }
+                            TextButton(onClick = { viewModel.marcarNoPresento(detalle.cita.idCita!!); citaDetalle = null }) {
+                                Text("No presentó", color = ColorError)
+                            }
+                        }
+                        else -> {}
+                    }
                 }
             }
         )
@@ -502,7 +592,7 @@ private fun FilaDetalle(label: String, valor: String, colores: BarberiaColores) 
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 1 — AGENDA (selector de día y bloque de descanso)
+// TAB 1 — AGENDA (descanso y citas de hoy)
 // ══════════════════════════════════════════════════════════════════════════════
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -511,7 +601,7 @@ private fun AgendaTab(
     viewModel: BarberoViewModel,
     colores: BarberiaColores
 ) {
-    val diasSemana = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+    var showDialog by remember { mutableStateOf(false) }
     var selectedDay by remember { mutableStateOf<String?>(null) }
     var selectedBlock by remember { mutableStateOf<String?>(null) }
 
@@ -524,167 +614,121 @@ private fun AgendaTab(
         blocks
     }
 
-    fun bloqueOcupado(bloque: String): Boolean {
-        val parts = bloque.split("-")
-        if (parts.size != 2) return false
-        val (inicio, finPart) = parts[0] to parts[1]
-        return uiState.bloqueos.any { b ->
-            val ini = b.fechaInicio?.substringAfter("T")?.take(5) ?: ""
-            val fin = b.fechaFin?.substringAfter("T")?.take(5) ?: ""
-            ini < finPart && fin > inicio
-        } || uiState.citasHoy.any { c ->
-            val ci = c.horaInicio?.take(5) ?: ""
-            val cf = c.horaFin?.take(5) ?: ""
-            ci < finPart && cf > inicio
-        } || uiState.todosBloqueos.any { b ->
-            val ini = b.fechaInicio?.substringAfter("T")?.take(5) ?: ""
-            val fin = b.fechaFin?.substringAfter("T")?.take(5) ?: ""
-            ini < finPart && fin > inicio
-        }
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    PullToRefreshBox(
+        isRefreshing = uiState.isLoading,
+        onRefresh = { viewModel.cargarDatosIniciales() },
+        modifier = Modifier.fillMaxSize()
     ) {
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("Bloquear descanso", color = colores.texto,
-                fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("Selecciona un día y un bloque de 30 min para descanso",
-                color = colores.textoSub, fontSize = 13.sp)
-        }
+        Column(
+            modifier = Modifier.fillMaxSize().background(colores.fondo)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Agenda", color = colores.texto, fontSize = 22.sp, fontWeight = FontWeight.Bold)
 
-        item {
-            Text("Día de la semana", color = colores.texto,
-                fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
+            Button(
+                onClick = { showDialog = true },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = ColorAzul)
             ) {
-                diasSemana.forEach { dia ->
-                    val seleccionado = selectedDay == dia
-                    FilterChip(
-                        selected = seleccionado,
-                        onClick = {
-                            selectedDay = if (seleccionado) null else dia
-                            selectedBlock = null
-                        },
-                        label = { Text(dia, fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = ColorAzul,
-                            selectedLabelColor = Color.White
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            borderColor = if (seleccionado) ColorAzul else colores.borde,
-                            selectedBorderColor = ColorAzul,
-                            enabled = true,
-                            selected = seleccionado
-                        )
-                    )
-                }
-            }
-        }
-
-        if (selectedDay != null) {
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Bloques de 30 min", color = colores.texto,
-                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(8.dp))
+                Icon(Icons.Filled.Lock, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Organizar descanso", fontWeight = FontWeight.SemiBold)
             }
 
-            item {
-                val chunks = bloques30.chunked(4)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    chunks.forEach { row ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            row.forEach { bloque ->
-                                val ocupado = bloqueOcupado(bloque)
-                                val seleccionado = selectedBlock == bloque
-                                FilterChip(
-                                    selected = seleccionado,
-                                    onClick = {
-                                        if (!ocupado) {
-                                            selectedBlock = if (seleccionado) null else bloque
-                                        }
-                                    },
-                                    label = {
-                                        Text(
-                                            if (ocupado) "$bloque Ocupado" else bloque,
-                                            fontSize = 11.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+            if (showDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDialog = false; selectedDay = null; selectedBlock = null },
+                    containerColor = colores.superficie,
+                    shape = RoundedCornerShape(20.dp),
+                    title = {
+                        Text("Selecciona día y bloque de descanso",
+                            color = colores.texto, fontWeight = FontWeight.Bold)
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Día", color = colores.texto, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                listOf("LUNES","MARTES","MIERCOLES","JUEVES","VIERNES","SABADO","DOMINGO").forEach { dia ->
+                                    FilterChip(
+                                        selected = selectedDay == dia,
+                                        onClick = { selectedDay = if (selectedDay == dia) null else dia },
+                                        label = { Text(dia.take(3), fontSize = 11.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = ColorAzul, selectedLabelColor = Color.White
                                         )
-                                    },
-                                    enabled = !ocupado,
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = ColorAzul,
-                                        selectedLabelColor = Color.White,
-                                        containerColor = if (ocupado)
-                                            colores.superficie.copy(alpha = 0.5f)
-                                        else colores.superficie,
-                                        labelColor = if (ocupado) colores.textoSub else colores.texto
-                                    ),
-                                    border = FilterChipDefaults.filterChipBorder(
-                                        borderColor = if (ocupado) ColorError.copy(alpha = 0.3f)
-                                        else if (seleccionado) ColorAzul else colores.borde,
-                                        selectedBorderColor = ColorAzul,
-                                        enabled = !ocupado,
-                                        selected = seleccionado
                                     )
-                                )
+                                }
+                            }
+                            if (selectedDay != null) {
+                                Text("Bloque", color = colores.texto, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                val chunks = bloques30.chunked(4)
+                                chunks.forEach { row ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                                        row.forEach { bloque ->
+                                            FilterChip(
+                                                selected = selectedBlock == bloque,
+                                                onClick = { selectedBlock = if (selectedBlock == bloque) null else bloque },
+                                                label = { Text(bloque, fontSize = 10.sp) },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = ColorAzul, selectedLabelColor = Color.White
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                BotonBarberoAnimado(
-                    text = "Guardar bloque de descanso",
-                    icon = Icons.Filled.Lock,
-                    color = if (selectedBlock != null) ColorAzul else colores.borde,
-                    enabled = selectedBlock != null,
-                    colores = colores,
-                    onClick = {
-                        selectedDay?.let { d ->
-                            selectedBlock?.let { b ->
-                                viewModel.guardarBloqueoDescanso(d, b)
-                                selectedBlock = null
-                                selectedDay = null
-                            }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                selectedDay?.let { d ->
+                                    selectedBlock?.let { b ->
+                                        viewModel.guardarBloqueoDescanso(d, b)
+                                        showDialog = false; selectedDay = null; selectedBlock = null
+                                    }
+                                }
+                            },
+                            enabled = selectedDay != null && selectedBlock != null
+                        ) {
+                            Text("Guardar", color = ColorAzul)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDialog = false; selectedDay = null; selectedBlock = null }) {
+                            Text("Cancelar", color = colores.textoSub)
                         }
                     }
                 )
             }
-        }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-            SeccionTituloBarbero("Bloqueos activos", colores)
-            Spacer(modifier = Modifier.height(10.dp))
-        }
+            HorizontalDivider(color = colores.borde)
 
-        if (uiState.bloqueos.isEmpty()) {
-            item {
-                Text("Sin bloqueos activos", color = colores.textoSub, fontSize = 13.sp)
-            }
-        } else {
-            items(uiState.bloqueos) { bloqueo ->
-                TarjetaBloqueoBarbero(bloqueo, colores) {
-                    bloqueo.idBloqueo?.let { viewModel.eliminarBloqueo(it) }
+            Text("Mis citas de hoy", color = colores.texto, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+
+            if (uiState.citasConDetalle.isEmpty()) {
+                Text("Sin citas para hoy", color = colores.textoSub, fontSize = 14.sp)
+            } else {
+                uiState.citasConDetalle.forEach { detalle ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = colores.superficie)
+                    ) {
+                        Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(detalle.cita.horaInicio?.take(5) ?: "--:--",
+                                color = ColorAzul, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Column {
+                                Text(detalle.clienteNombre, color = colores.texto, fontWeight = FontWeight.Medium)
+                                Text(detalle.servicioNombre, color = colores.textoSub, fontSize = 12.sp)
+                            }
+                        }
+                    }
                 }
             }
         }
-
-        item { Spacer(modifier = Modifier.height(20.dp)) }
     }
 }
 
@@ -707,7 +751,7 @@ private fun ResenasBarberoTab(
     ) {
         item {
             Spacer(modifier = Modifier.height(20.dp))
-            Text("Mis reseñas", color = colores.texto,
+            Text("Reseñas", color = colores.texto,
                 fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
 
@@ -761,7 +805,7 @@ private fun ResenasBarberoTab(
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Filled.StarOutline, null,
                             tint = colores.textoSub, modifier = Modifier.size(48.dp))
-                        Text("Aún no tienes reseñas",
+                        Text("Sin reseñas aún",
                             color = colores.textoSub, fontSize = 15.sp)
                     }
                 }
@@ -791,18 +835,28 @@ private fun HorariosBarberoTab(
     uiState: com.example.barberia.viewmodel.BarberoUiState,
     colores: BarberiaColores
 ) {
-    val diaCompleto = mapOf(
-        DiaSemanaEnum.LUNES to "Lunes", DiaSemanaEnum.MARTES to "Martes",
-        DiaSemanaEnum.MIERCOLES to "Miércoles", DiaSemanaEnum.JUEVES to "Jueves",
-        DiaSemanaEnum.VIERNES to "Viernes", DiaSemanaEnum.SABADO to "Sábado",
-        DiaSemanaEnum.DOMINGO to "Domingo"
-    )
+    val diasSemana = listOf("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO")
+    var selectedDay by remember { mutableStateOf<String?>(null) }
 
-    val diasConHorario = uiState.horarios.map { it.diaSemana }.toSet()
-    val todosDias = DiaSemanaEnum.entries.map { dia ->
-        val horariosDia = uiState.horarios.filter { it.diaSemana == dia }
-        val esDescanso = horariosDia.isEmpty()
-        Triple(dia, horariosDia, esDescanso)
+    val citasFiltradas = remember(selectedDay, uiState.todasLasCitas, uiState.citasConDetalle) {
+        if (selectedDay == null) emptyList()
+        else {
+            val targetIndex = diasSemana.indexOf(selectedDay)
+            uiState.todasLasCitas.filter { cita ->
+                try {
+                    val parts = cita.fecha.split("-")
+                    if (parts.size < 3) false
+                    else {
+                        val cal = java.util.Calendar.getInstance()
+                        cal.set(java.util.Calendar.YEAR, parts[0].toInt())
+                        cal.set(java.util.Calendar.MONTH, parts[1].toInt() - 1)
+                        cal.set(java.util.Calendar.DAY_OF_MONTH, parts[2].toInt())
+                        val diaIndex = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
+                        diaIndex == targetIndex
+                    }
+                } catch (_: Exception) { false }
+            }
+        }
     }
 
     LazyColumn(
@@ -812,168 +866,75 @@ private fun HorariosBarberoTab(
     ) {
         item {
             Spacer(modifier = Modifier.height(20.dp))
-            Text("Mi Horario", color = colores.texto,
-                fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("Horarios configurados para la semana",
-                color = colores.textoSub, fontSize = 13.sp)
+            Text("Horarios", color = colores.texto, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
 
-        if (uiState.horarios.isEmpty()) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().height(180.dp),
-                    contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Filled.Schedule, null,
-                            tint = colores.textoSub, modifier = Modifier.size(48.dp))
-                        Text("Sin horarios configurados",
-                            color = colores.textoSub, fontSize = 15.sp)
-                        Text("El administrador debe configurar tus horarios",
-                            color = colores.textoSub.copy(0.7f), fontSize = 12.sp)
-                    }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                diasSemana.forEach { dia ->
+                    val seleccionado = selectedDay == dia
+                    FilterChip(
+                        selected = seleccionado,
+                        onClick = { selectedDay = if (seleccionado) null else dia },
+                        label = { Text(dia.take(3), fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = ColorAzul,
+                            selectedLabelColor = Color.White
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            borderColor = if (seleccionado) ColorAzul else colores.borde,
+                            selectedBorderColor = ColorAzul,
+                            enabled = true,
+                            selected = seleccionado
+                        )
+                    )
                 }
             }
-        } else {
-            todosDias.forEach { (dia, horariosDia, esDescanso) ->
+        }
+
+        if (selectedDay != null) {
+            if (citasFiltradas.isEmpty()) {
                 item {
-                    if (esDescanso) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = ColorError.copy(alpha = 0.08f)),
-                            elevation = CardDefaults.cardElevation(
-                                defaultElevation = colores.sombra.dp)
-                        ) {
-                            Row(modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.Filled.Bedtime, null,
-                                    tint = ColorError, modifier = Modifier.size(20.dp))
-                                Text(diaCompleto[dia] ?: dia.name,
-                                    color = ColorError, fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.weight(1f))
-                                Text("Día de descanso", color = ColorError.copy(alpha = 0.7f),
-                                    fontSize = 11.sp)
-                            }
-                        }
-                    } else {
-                        Text(diaCompleto[dia] ?: dia.name,
-                            color = ColorAzul, fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 4.dp))
+                    Box(modifier = Modifier.fillMaxWidth().height(160.dp),
+                        contentAlignment = Alignment.Center) {
+                        Text("Sin citas para este día", color = colores.textoSub, fontSize = 15.sp)
                     }
                 }
-
-                if (!esDescanso) {
-                    for (horario in horariosDia) {
-                        item {
-                            val bloquesDelDia = remember(horario.horaInicio, horario.horaFin) {
-                                val ini = horario.horaInicio?.take(5) ?: "09:00"
-                                val fin = horario.horaFin?.take(5) ?: "19:00"
-                                val startH = ini.substringBefore(":").toIntOrNull() ?: 9
-                                val startM = ini.substringAfter(":").toIntOrNull() ?: 0
-                                val endH = fin.substringBefore(":").toIntOrNull() ?: 19
-                                val endM = fin.substringAfter(":").toIntOrNull() ?: 0
-                                val blks = mutableListOf<String>()
-                                var h = startH
-                                var m = startM
-                                while (h < endH || (h == endH && m < endM)) {
-                                    val nextH = if (m == 0) h else h + 1
-                                    val nextM = if (m == 0) 30 else 0
-                                    blks.add("%02d:%02d-%02d:%02d".format(h, m, nextH, nextM))
-                                    h = nextH; m = nextM
-                                }
-                                blks
+            } else {
+                items(citasFiltradas) { cita ->
+                    val detalle = uiState.citasConDetalle.find { it.cita.idCita == cita.idCita }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = colores.superficie)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(cita.horaInicio?.take(5) ?: "--:--",
+                                    color = ColorAzul, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text(cita.horaFin?.take(5) ?: "--:--",
+                                    color = colores.textoSub, fontSize = 12.sp)
                             }
-
-                            Card(
-                                modifier = Modifier.fillMaxWidth().shadow(4.dp, RoundedCornerShape(14.dp)),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = colores.superficie)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text("${horario.horaInicio?.take(5)} - ${horario.horaFin?.take(5)}",
-                                        color = colores.texto,
-                                        fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    val blockChunks = bloquesDelDia.chunked(4)
-                                    blockChunks.forEach { row ->
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-                                        ) {
-                                            row.forEach { blk ->
-                                                val ocupado = uiState.citasConDetalle.any { det ->
-                                                    val ci = det.cita.horaInicio?.take(5) ?: ""
-                                                    val cf = det.cita.horaFin?.take(5) ?: ""
-                                                    ci < blk.substringAfter("-").take(5) &&
-                                                            cf > blk.take(5)
-                                                }
-                                                val esBloqueo = uiState.bloqueos.any { b ->
-                                                    val bi = b.fechaInicio?.substringAfter("T")?.take(5) ?: ""
-                                                    val bf = b.fechaFin?.substringAfter("T")?.take(5) ?: ""
-                                                    bi <= blk.substringAfter("-").take(5) && bf >= blk.take(5)
-                                                }
-                                                val detOcupado = if (ocupado) {
-                                                    uiState.citasConDetalle.find { det ->
-                                                        val ci = det.cita.horaInicio?.take(5) ?: ""
-                                                        val cf = det.cita.horaFin?.take(5) ?: ""
-                                                        ci < blk.substringAfter("-").take(5) &&
-                                                                cf > blk.take(5)
-                                                    }
-                                                } else null
-
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .clip(RoundedCornerShape(6.dp))
-                                                        .background(
-                                                            when {
-                                                                esBloqueo -> ColorAzul.copy(alpha = 0.2f)
-                                                                ocupado -> ColorVerde.copy(alpha = 0.15f)
-                                                                else -> colores.superficie2
-                                                            }
-                                                        )
-                                                        .border(
-                                                            0.5.dp,
-                                                            when {
-                                                                esBloqueo -> ColorAzul.copy(alpha = 0.4f)
-                                                                ocupado -> ColorVerde.copy(alpha = 0.3f)
-                                                                else -> colores.borde
-                                                            },
-                                                            RoundedCornerShape(6.dp)
-                                                        )
-                                                        .padding(horizontal = 4.dp, vertical = 3.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    if (esBloqueo) {
-                                                        Text("Descanso", color = ColorAzul,
-                                                            fontSize = 8.sp, fontWeight = FontWeight.Medium,
-                                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    } else if (detOcupado != null) {
-                                                        Text(
-                                                            "${detOcupado.clienteNombre.take(6)} - ${detOcupado.servicioNombre.take(8)}",
-                                                            color = ColorVerde, fontSize = 7.sp,
-                                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    } else {
-                                                        Text(blk, color = colores.textoSub,
-                                                            fontSize = 7.sp,
-                                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    detalle?.clienteNombre ?: "Cliente #${cita.idUsuario}",
+                                    color = colores.texto, fontWeight = FontWeight.Medium, fontSize = 14.sp
+                                )
+                                Text(
+                                    detalle?.servicioNombre ?: "Servicio #${cita.idServicio}",
+                                    color = colores.textoSub, fontSize = 12.sp
+                                )
                             }
                         }
                     }
                 }
             }
         }
+
         item { Spacer(modifier = Modifier.height(20.dp)) }
     }
 }

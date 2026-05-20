@@ -405,7 +405,7 @@ fun RegisterScreen(
                 )
 
                 Text(
-                    text = "Al registrarte aceptas nuestros términos de uso.\nTu cuenta será de tipo CLIENTE.",
+                    text = "Al registrarte aceptas nuestros términos de uso.",
                     color = colores.textoSub,
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center,

@@ -55,12 +55,14 @@ class BarberoViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
                 val citasHoy  = apiService.getCitasByBarberoYFecha(idBarbero, fechaHoy)
-                val resenas   = apiService.getResenasByBarbero(idBarbero)
                 val bloqueos  = apiService.getBloqueosByBarbero(idBarbero)
                 val horarios  = apiService.getHorariosByBarbero(idBarbero)
 
                 val citas = if (citasHoy.isSuccessful) citasHoy.body() ?: emptyList() else emptyList()
-                val resenasList = if (resenas.isSuccessful) resenas.body() ?: emptyList() else emptyList()
+                val resenasList = if (idBarbero != 0L) {
+                    val resenasResp = apiService.getResenasByBarbero(idBarbero)
+                    if (resenasResp.isSuccessful) resenasResp.body() ?: emptyList() else emptyList()
+                } else emptyList()
                 val bloqueosList = if (bloqueos.isSuccessful) bloqueos.body() ?: emptyList() else emptyList()
                 val horariosList = if (horarios.isSuccessful) horarios.body() ?: emptyList() else emptyList()
 
@@ -209,6 +211,26 @@ class BarberoViewModel(
                 } else {
                     _uiState.value = _uiState.value.copy(
                         errorMessage = "Error al marcar la cita"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Sin conexión.")
+            }
+        }
+    }
+
+    fun cancelarCita(idCita: Long) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.cancelarCita(idCita)
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        successMessage = "Cita cancelada"
+                    )
+                    cargarDatosIniciales()
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = "Error al cancelar la cita (${response.code()})"
                     )
                 }
             } catch (e: Exception) {

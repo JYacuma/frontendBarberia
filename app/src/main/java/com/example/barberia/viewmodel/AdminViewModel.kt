@@ -320,6 +320,46 @@ class AdminViewModel(
         }
     }
 
+    fun finalizarCita(idCita: Long) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.finalizarCita(idCita)
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        successMessage = "Cita finalizada"
+                    )
+                    cargarDatosIniciales()
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = "Error al finalizar la cita"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Sin conexión.")
+            }
+        }
+    }
+
+    fun noPresentoCita(idCita: Long) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.noPresento(idCita)
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        successMessage = "Cita marcada como no presentado"
+                    )
+                    cargarDatosIniciales()
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = "Error al marcar cita como no presentado"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Sin conexión.")
+            }
+        }
+    }
+
     fun seleccionarBarbero(barbero: BarberoDTO?) {
         _uiState.value = _uiState.value.copy(barberoSeleccionado = barbero)
         if (barbero != null) cargarHorarios(barbero.idBarbero!!)

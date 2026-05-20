@@ -66,6 +66,7 @@ fun SuperAdminScreen(
     val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
     val colores = LocalBarberiaColores.current
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
 
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {
@@ -80,40 +81,100 @@ fun SuperAdminScreen(
         }
     }
 
-    Scaffold(
-        containerColor = colores.fondo,
-        snackbarHost = {
-            SnackbarHost(snackbarState) { data ->
-                Snackbar(snackbarData = data,
-                    containerColor = colores.superficie,
-                    contentColor   = colores.texto,
-                    actionColor    = SuperAccent,
-                    shape          = RoundedCornerShape(12.dp))
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        gesturesEnabled = true,
+        drawerContent = {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Box(modifier = Modifier.size(52.dp).clip(CircleShape)
+                    .background(SuperAccent),
+                    contentAlignment = Alignment.Center) {
+                    Text(getInitials(nombre), color = Color.White,
+                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = colores.borde)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Tema", color = colores.textoSub, fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = TemaManager.modoOscuro.value == false,
+                        onClick = { TemaManager.modoOscuro.value = false },
+                        label = { Text("Claro", fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = SuperAccent,
+                            selectedLabelColor = Color.White)
+                    )
+                    FilterChip(
+                        selected = TemaManager.modoOscuro.value == null,
+                        onClick = { TemaManager.modoOscuro.value = null },
+                        label = { Text("Sistema", fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = SuperAccent,
+                            selectedLabelColor = Color.White)
+                    )
+                    FilterChip(
+                        selected = TemaManager.modoOscuro.value == true,
+                        onClick = { TemaManager.modoOscuro.value = true },
+                        label = { Text("Oscuro", fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = SuperAccent,
+                            selectedLabelColor = Color.White)
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                Button(
+                    onClick = onLogout,
+                    colors = ButtonDefaults.buttonColors(containerColor = ColorError),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Logout, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Cerrar sesión", fontWeight = FontWeight.SemiBold)
+                }
             }
         },
-        bottomBar = {
-            SuperAdminBottomBar(pagerState.currentPage, colores) { index ->
-                scope.launch { pagerState.animateScrollToPage(index) }
+        content = {
+            Scaffold(
+                containerColor = colores.fondo,
+                snackbarHost = {
+                    SnackbarHost(snackbarState) { data ->
+                        Snackbar(snackbarData = data,
+                            containerColor = colores.superficie,
+                            contentColor   = colores.texto,
+                            actionColor    = SuperAccent,
+                            shape          = RoundedCornerShape(12.dp))
+                    }
+                },
+                bottomBar = {
+                    SuperAdminBottomBar(pagerState.currentPage, colores) { index ->
+                        scope.launch { pagerState.animateScrollToPage(index) }
+                    }
+                }
+            ) { padding ->
+                HorizontalPager(
+                    state             = pagerState,
+                    modifier          = Modifier.padding(padding).fillMaxSize(),
+                    userScrollEnabled = true
+                ) { pagina ->
+                    when (pagina) {
+                        0 -> SuperInicioTab(nombre, uiState, viewModel,
+                            onLogout, colores,
+                            onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
+                            onNavigateToNotificaciones = onNavigateToNotificaciones,
+                            onOpenDrawer = { scope.launch { drawerState.open() } })
+                        1 -> SuperUsuariosTab(uiState, viewModel, colores)
+                        2 -> SuperBarberosTab(uiState, viewModel, colores)
+                        3 -> SuperServiciosTab(uiState, viewModel, colores)
+                        4 -> SuperCitasTab(uiState, viewModel, colores)
+                    }
+                }
             }
         }
-    ) { padding ->
-        HorizontalPager(
-            state             = pagerState,
-            modifier          = Modifier.padding(padding).fillMaxSize(),
-            userScrollEnabled = true
-        ) { pagina ->
-            when (pagina) {
-                0 -> SuperInicioTab(nombre, uiState, viewModel,
-                    onLogout, colores,
-                    onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
-                    onNavigateToNotificaciones = onNavigateToNotificaciones)
-                1 -> SuperUsuariosTab(uiState, viewModel, colores)
-                2 -> SuperBarberosTab(uiState, viewModel, colores)
-                3 -> SuperServiciosTab(uiState, viewModel, colores)
-                4 -> SuperCitasTab(uiState, viewModel, colores)
-            }
-        }
-    }
+    )
 }
 
 // ── Bottom Bar — 5 tabs, acento dorado ───────────────────────────────────────
@@ -167,29 +228,9 @@ fun SuperInicioTab(
     onLogout: () -> Unit,
     colores: BarberiaColores,
     onNavigateToTab: (Int) -> Unit,
-    onNavigateToNotificaciones: () -> Unit = {}
-) {
-    var isRefreshing by remember { mutableStateOf(false) }
-
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.cargarDatosIniciales()
-            isRefreshing = false
-        }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-        ) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().background(
-                    Brush.verticalGradient(
-                        if (colores.esModoOscuro)
-                            listOf(Color(0xFF120E02), colores.fondo)
-                        else
-                            listOf(Color(0xFFFFFAF0), colores.fondo)
-                    )
+    onNavigateToNotificaciones: () -> Unit = {},
+    onOpenDrawer: () -> Unit = {}
+)
                 )) {
                     Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
                         Brush.horizontalGradient(
@@ -238,22 +279,6 @@ fun SuperInicioTab(
                                         Icon(Icons.Filled.Notifications, null,
                                             tint = colores.textoSub, modifier = Modifier.size(22.dp))
                                     }
-                                }
-                                IconButton(onClick = { TemaManager.toggleModo() }) {
-                                    Icon(
-                                        imageVector = when (TemaManager.modoOscuro.value) {
-                                            null  -> Icons.Filled.BrightnessMedium
-                                            true  -> Icons.Filled.DarkMode
-                                            false -> Icons.Filled.LightMode
-                                        },
-                                        contentDescription = "Modo",
-                                        tint = colores.textoSub,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                IconButton(onClick = onLogout) {
-                                    Icon(Icons.AutoMirrored.Filled.Logout, null,
-                                        tint = colores.textoSub, modifier = Modifier.size(22.dp))
                                 }
                             }
                         }
@@ -494,14 +519,34 @@ fun SuperUsuariosTab(
             }
 
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        SuperFiltroChip("Todos", filtroRol == null, colores) {
-                            filtroRol = null }
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    Button(
+                        onClick = { expanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colores.superficie2,
+                            contentColor = colores.texto),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(if (filtroRol == null) "Filtrar" else filtroRol!!.name,
+                            fontSize = 13.sp)
+                        Spacer(Modifier.width(4.dp))
+                        Text("▼", fontSize = 10.sp)
                     }
-                    items(RolEnum.entries.toTypedArray()) { rol ->
-                        SuperFiltroChip(rol.name, filtroRol == rol, colores) {
-                            filtroRol = rol }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Todos") },
+                            onClick = { filtroRol = null; expanded = false }
+                        )
+                        RolEnum.entries.forEach { rol ->
+                            DropdownMenuItem(
+                                text = { Text(rol.name) },
+                                onClick = { filtroRol = rol; expanded = false }
+                            )
+                        }
                     }
                 }
             }
@@ -969,14 +1014,37 @@ fun SuperServiciosTab(
             }
 
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf(
-                        0 to "Todos", 1 to "Más populares",
-                        2 to "Precio bajo→alto", 3 to "Precio alto→bajo",
-                        4 to "Por tipo"
-                    )) { (idx, label) ->
-                        SuperFiltroChip(label, filtroServicio == idx, colores) {
-                            filtroServicio = idx
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    Button(
+                        onClick = { expanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colores.superficie2,
+                            contentColor = colores.texto),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        val filtroLabels = listOf(
+                            "Todos", "Más populares",
+                            "Precio bajo→alto", "Precio alto→bajo", "Por tipo"
+                        )
+                        Text(filtroLabels.getOrElse(filtroServicio) { "Filtrar" },
+                            fontSize = 13.sp)
+                        Spacer(Modifier.width(4.dp))
+                        Text("▼", fontSize = 10.sp)
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        listOf(
+                            0 to "Todos", 1 to "Más populares",
+                            2 to "Precio bajo→alto", 3 to "Precio alto→bajo",
+                            4 to "Por tipo"
+                        ).forEach { (idx, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = { filtroServicio = idx; expanded = false }
+                            )
                         }
                     }
                 }
@@ -1180,6 +1248,7 @@ fun SuperCitasTab(
     colores: BarberiaColores
 ) {
     var citaACancelar by remember { mutableStateOf<CitaConDetalle?>(null) }
+    var citaDetalle by remember { mutableStateOf<CitaConDetalle?>(null) }
     var filtroEstado  by remember { mutableStateOf<EstadoCitaEnum?>(null) }
     var isRefreshing  by remember { mutableStateOf(false) }
 
@@ -1208,24 +1277,48 @@ fun SuperCitasTab(
             }
 
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        SuperFiltroChip("Todas", filtroEstado == null, colores) {
-                            filtroEstado = null }
-                    }
-                    items(EstadoCitaEnum.entries.toTypedArray()) { estado ->
-                        SuperFiltroChip(
-                            texto = when (estado) {
-                                EstadoCitaEnum.PENDIENTE     -> "Pendientes"
-                                EstadoCitaEnum.EN_CURSO      -> "En curso"
-                                EstadoCitaEnum.FINALIZADA    -> "Finalizadas"
-                                EstadoCitaEnum.CANCELADA     -> "Canceladas"
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    Button(
+                        onClick = { expanded = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colores.superficie2,
+                            contentColor = colores.texto),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(if (filtroEstado == null) "Filtrar"
+                            else when (filtroEstado) {
+                                EstadoCitaEnum.PENDIENTE -> "Pendientes"
+                                EstadoCitaEnum.EN_CURSO -> "En curso"
+                                EstadoCitaEnum.FINALIZADA -> "Finalizadas"
+                                EstadoCitaEnum.CANCELADA -> "Canceladas"
                                 EstadoCitaEnum.NO_PRESENTADO -> "No presentó"
-                            },
-                            seleccionado = filtroEstado == estado,
-                            colores      = colores,
-                            onClick      = { filtroEstado = estado }
+                            }, fontSize = 13.sp)
+                        Spacer(Modifier.width(4.dp))
+                        Text("▼", fontSize = 10.sp)
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Todas") },
+                            onClick = { filtroEstado = null; expanded = false }
                         )
+                        EstadoCitaEnum.entries.forEach { estado ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(when (estado) {
+                                        EstadoCitaEnum.PENDIENTE -> "Pendientes"
+                                        EstadoCitaEnum.EN_CURSO -> "En curso"
+                                        EstadoCitaEnum.FINALIZADA -> "Finalizadas"
+                                        EstadoCitaEnum.CANCELADA -> "Canceladas"
+                                        EstadoCitaEnum.NO_PRESENTADO -> "No presentó"
+                                    })
+                                },
+                                onClick = { filtroEstado = estado; expanded = false }
+                            )
+                        }
                     }
                 }
             }
@@ -1250,6 +1343,7 @@ fun SuperCitasTab(
                     TarjetaCitaSuper(
                         detalle  = detalle,
                         colores  = colores,
+                        onClick  = { citaDetalle = detalle },
                         onCancelar = {
                             if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE ||
                                 detalle.cita.estado == EstadoCitaEnum.EN_CURSO)
@@ -1280,6 +1374,41 @@ fun SuperCitasTab(
             dismissButton = {
                 TextButton(onClick = { citaACancelar = null }) {
                     Text("No", color = colores.textoSub) }
+            }
+        )
+    }
+
+    citaDetalle?.let { detalle ->
+        AlertDialog(
+            onDismissRequest = { citaDetalle = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = { Text("Cita #${detalle.cita.idCita}", color = colores.texto,
+                fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DetalleCitaItem("Fecha", detalle.cita.fecha, Icons.Filled.CalendarMonth, colores)
+                    DetalleCitaItem("Hora inicio", detalle.cita.horaInicio.take(5), Icons.Filled.Schedule, colores)
+                    DetalleCitaItem("Hora fin", detalle.cita.horaFin?.take(5) ?: "—", Icons.Filled.Schedule, colores)
+                    DetalleCitaItem("Cliente", detalle.clienteNombre, Icons.Filled.Person, colores)
+                    DetalleCitaItem("Barbero", detalle.barberoNombre, Icons.Filled.ContentCut, colores)
+                    DetalleCitaItem("Servicio", detalle.servicioNombre, Icons.Filled.ShoppingBag, colores)
+                    DetalleCitaItem("Estado", detalle.cita.estado?.name ?: "", Icons.Filled.Info, colores)
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE ||
+                        detalle.cita.estado == EstadoCitaEnum.EN_CURSO) {
+                        BarberiaBoton("Cancelar", colorFondo = ColorError, onClick = {
+                            citaDetalle = null
+                            citaACancelar = detalle
+                        })
+                    }
+                    BarberiaBoton("Cerrar", colorFondo = SuperAccent, onClick = {
+                        citaDetalle = null
+                    })
+                }
             }
         )
     }
@@ -1378,7 +1507,8 @@ fun TarjetaUsuarioSuper(
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(usuario.nombre ?: "Sin nombre", color = colores.texto,
-                        fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                        fontWeight = FontWeight.Medium, fontSize = 14.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Box(modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .background(colorRol.copy(0.15f))
@@ -1430,9 +1560,11 @@ fun TarjetaBarberoSuper(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(barbero.nombre, color = colores.texto,
-                    fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                    fontWeight = FontWeight.Medium, fontSize = 14.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(barbero.especialidad ?: "Sin especialidad",
-                    color = colores.textoSub, fontSize = 12.sp)
+                    color = colores.textoSub, fontSize = 12.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Switch(checked = barbero.activo ?: false,
                 onCheckedChange = { onToggle() },
@@ -1474,9 +1606,11 @@ fun TarjetaServicioSuper(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(servicio.nombre, color = colores.texto,
-                    fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                    fontWeight = FontWeight.Medium, fontSize = 14.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${servicio.duracionMinutos} min",
-                    color = colores.textoSub, fontSize = 12.sp)
+                    color = colores.textoSub, fontSize = 12.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text("\$${servicio.precio.toInt()}", color = SuperAccent,
                 fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -1496,6 +1630,7 @@ fun TarjetaServicioSuper(
 fun TarjetaCitaSuper(
     detalle: CitaConDetalle,
     colores: BarberiaColores,
+    onClick: () -> Unit = {},
     onCancelar: () -> Unit
 ) {
     val colorEstado = when (detalle.cita.estado) {
@@ -1506,7 +1641,9 @@ fun TarjetaCitaSuper(
         EstadoCitaEnum.NO_PRESENTADO -> colores.textoSub
         null                         -> colores.textoSub
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+    Card(modifier = Modifier.fillMaxWidth()
+        .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
         Row {
@@ -1517,10 +1654,12 @@ fun TarjetaCitaSuper(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically) {
                     Column {
-                        Text(detalle.clienteNombre, color = colores.texto,
-                            fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(detalle.clienteNombre, color = colores.texto,
+                            fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("${detalle.cita.fecha} · ${detalle.cita.horaInicio?.take(5)}",
-                            color = colores.textoSub, fontSize = 12.sp)
+                            color = colores.textoSub, fontSize = 12.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1581,8 +1720,15 @@ fun SuperFiltroChip(
             fontWeight = if (seleccionado) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
-
-
-
-
-
+@Composable
+private fun DetalleCitaItem(label: String, value: String, icono: ImageVector, colores: BarberiaColores) {
+    Row(verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(icono, null, tint = SuperAccent, modifier = Modifier.size(16.dp))
+        Column {
+            Text(label, color = colores.textoSub, fontSize = 11.sp)
+            Text(value, color = colores.texto, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}

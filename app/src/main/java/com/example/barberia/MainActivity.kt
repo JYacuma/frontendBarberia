@@ -28,6 +28,7 @@ import com.example.barberia.ui.auth.RegisterScreen
 import com.example.barberia.ui.screens.AdminScreen
 import com.example.barberia.ui.screens.BarberoScreen
 import com.example.barberia.ui.screens.NotificacionesScreen
+import com.example.barberia.ui.screens.PerfilScreen
 import com.example.barberia.ui.screens.SuperAdminScreen
 import com.example.barberia.ui.theme.*
 import com.example.barberia.utils.SessionManager
@@ -41,6 +42,7 @@ object Routes {
     const val ADMIN_HOME      = "admin_home"
     const val SUPERADMIN_HOME = "superadmin_home"
     const val NOTIFICACIONES  = "notificaciones"
+    const val PERFIL          = "perfil"
 }
 
 class MainActivity : ComponentActivity() {
@@ -159,7 +161,8 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onNavigateToNotificaciones = {
                                         navController.navigate(Routes.NOTIFICACIONES)
-                                    }
+                                    },
+                                    onNavigateToPerfil = { navController.navigate(Routes.PERFIL) }
                                 )
                             }
 
@@ -186,11 +189,14 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onNavigateToNotificaciones = {
                                         navController.navigate(Routes.NOTIFICACIONES)
-                                    }
+                                    },
+                                    onNavigateToPerfil = { navController.navigate(Routes.PERFIL) }
                                 )
                             }
 
                             composable(Routes.ADMIN_HOME) {
+                                val idUsuario by sessionManager.id
+                                    .collectAsStateWithLifecycle(initialValue = 0L)
                                 val nombre by sessionManager.nombre
                                     .collectAsStateWithLifecycle(
                                         initialValue = "Administrador")
@@ -198,6 +204,7 @@ class MainActivity : ComponentActivity() {
                                 AdminScreen(
                                     apiService = RetrofitClient.apiService,
                                     nombre     = nombre ?: "Administrador",
+                                    idUsuario  = idUsuario ?: 0L,
                                     onLogout   = {
                                         scope.launch {
                                             authRepository.logout()
@@ -208,7 +215,8 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onNavigateToNotificaciones = {
                                         navController.navigate(Routes.NOTIFICACIONES)
-                                    }
+                                    },
+                                    onNavigateToPerfil = { idUsuario -> navController.navigate(Routes.PERFIL) }
                                 )
                             }
 
@@ -239,6 +247,22 @@ class MainActivity : ComponentActivity() {
                                     apiService = RetrofitClient.apiService,
                                     onVolver   = { navController.popBackStack() }
                                 )
+                            }
+
+                            composable(Routes.PERFIL) {
+                                val idUsuario = sessionManager.id
+                                    .collectAsStateWithLifecycle(initialValue = 0L)
+                                if (idUsuario.value != 0L) {
+                                    PerfilScreen(
+                                        apiService = RetrofitClient.apiService,
+                                        idUsuario = idUsuario.value,
+                                        onVolver = { navController.popBackStack() }
+                                    )
+                                } else {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
+                                }
                             }
                         }
                     }
@@ -287,4 +311,28 @@ class MainActivity : ComponentActivity() {
 //              notifica clientes "Tu cita fue cancelada por motivos mayores"
 // [SUPERADMIN] Tab Servicios: filtros y detalle como Admin
 // [SUPERADMIN] Tab Citas: vista detallada con filtros estado
+// v1.7 ──────────────────────────────────────────────────────────────────────
+// [REGISTER] Texto "Tu cuenta será de tipo CLIENTE" eliminado
+// [RETROFIT] GsonBuilder().setLenient() ya estaba configurado
+// [MODELS] getInitials() simplificado sin Normalizer (soporta tildes)
+// [HEADER] Header con círculo+iniciales solo en tab Inicio de cada rol
+//         - Demás tabs tienen título simple sin repetir header
+//         - Círculo abre ModalNavigationDrawer lateral
+//         - Drawer contiene: Perfil (excepto SUPERADMIN), selector tema
+//           3 estados (Claro/Sistema/Oscuro), Cerrar sesión
+//         - Theme toggle y logout quitados del header, solo en drawer
+// [PERFIL] Nueva pantalla PerfilScreen para editar nombre/teléfono
+//         - Ruta Routes.PERFIL en navegación
+//         - Admin/Barbero/Cliente pueden acceder desde drawer
+// [FILTROS] LazyRow de chips reemplazados por Button "Filtrar ▼" + DropdownMenu
+//           en todos los roles y tabs (citas, servicios, usuarios, barberos, reseñas)
+// [BARBERO] Tab Agenda: botón "Organizar descanso" + BottomSheet con chips día/bloque
+//           + lista "Mis citas de hoy" ordenada por hora
+// [BARBERO] Tab Reseñas: fix carga (idBarbero != 0L), muestra "Sin reseñas aún"
+// [BARBERO] Tab Horarios: ahora muestra citas del barbero por día de semana
+// [CITA] Todas las tarjetas de cita en todos los roles abren AlertDialog con detalle
+//        completo (#cita, fecha, hora, cliente, barbero, servicio, estado, acciones)
+// [CLIENTE] Fix carga inicial: espera idUsuario != 0L antes de cargar datos
+// [CLIENTE] onNavigateToPerfil en llamada a ClienteScreen
+// [TARJETAS] fillMaxWidth(), maxLines=1, TextOverflow.Ellipsis en todos los nombres
 // ────────────────────────────────────────────────────────────────────────────

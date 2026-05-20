@@ -40,7 +40,11 @@ class ClienteViewModel(
     private val _uiState = MutableStateFlow(ClienteUiState())
     val uiState: StateFlow<ClienteUiState> = _uiState
 
-    init { cargarDatosIniciales() }
+    init { if (idUsuario != 0L) cargarDatosIniciales() }
+
+    fun cargarSiUsuarioValido(id: Long) {
+        if (id != 0L) cargarDatosIniciales()
+    }
 
     fun cargarDatosIniciales() {
         if (idUsuario == 0L) {

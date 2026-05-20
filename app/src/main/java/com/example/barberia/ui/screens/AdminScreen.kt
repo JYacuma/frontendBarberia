@@ -53,7 +53,9 @@ private val AdminAccentSoft = ColorAzul.copy(alpha = 0.15f)
 fun AdminScreen(
     apiService: ApiService,
     nombre: String,
+    idUsuario: Long = 0L,
     onLogout: () -> Unit,
+    onNavigateToPerfil: (Long) -> Unit = {},
     onNavigateToNotificaciones: () -> Unit = {}
 ) {
     val colores       = LocalBarberiaColores.current
@@ -65,6 +67,7 @@ fun AdminScreen(
 
     val pagerState    = rememberPagerState(pageCount = { 6 })
     val scope         = rememberCoroutineScope()
+    val drawerState   = rememberDrawerState(DrawerValue.Closed)
     val snackbarState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.successMessage) {
@@ -80,41 +83,144 @@ fun AdminScreen(
         }
     }
 
-    Scaffold(
-        containerColor = colores.fondo,
-        snackbarHost = {
-            SnackbarHost(snackbarState) { data ->
-                Snackbar(snackbarData = data,
-                    containerColor = colores.superficie,
-                    contentColor   = colores.texto,
-                    actionColor    = AdminAccent,
-                    shape          = RoundedCornerShape(12.dp))
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        gesturesEnabled = true,
+        drawerContent = {
+            ModalDrawerSheet {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Box(
+                        modifier = Modifier.size(72.dp).clip(CircleShape).background(AdminAccent),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(getInitials(nombre), color = Color.White,
+                            fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(nombre, color = colores.texto,
+                        fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Spacer(modifier = Modifier.height(24.dp))
+                    HorizontalDivider()
+                    TextButton(
+                        onClick = { onNavigateToPerfil(idUsuario) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Person, null, tint = AdminAccent,
+                            modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Mi Perfil", color = colores.texto, fontSize = 15.sp)
+                    }
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Tema", color = colores.textoSub,
+                        fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()) {
+                        FilterChip(
+                            selected = TemaManager.modoOscuro.value == false,
+                            onClick = { TemaManager.modoOscuro.value = false },
+                            label = { Text("Claro", fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AdminAccent,
+                                selectedLabelColor = Color.White
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = colores.borde,
+                                selectedBorderColor = AdminAccent,
+                                enabled = true,
+                                selected = TemaManager.modoOscuro.value == false
+                            )
+                        )
+                        FilterChip(
+                            selected = TemaManager.modoOscuro.value == null,
+                            onClick = { TemaManager.modoOscuro.value = null },
+                            label = { Text("Sistema", fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AdminAccent,
+                                selectedLabelColor = Color.White
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = colores.borde,
+                                selectedBorderColor = AdminAccent,
+                                enabled = true,
+                                selected = TemaManager.modoOscuro.value == null
+                            )
+                        )
+                        FilterChip(
+                            selected = TemaManager.modoOscuro.value == true,
+                            onClick = { TemaManager.modoOscuro.value = true },
+                            label = { Text("Oscuro", fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AdminAccent,
+                                selectedLabelColor = Color.White
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = colores.borde,
+                                selectedBorderColor = AdminAccent,
+                                enabled = true,
+                                selected = TemaManager.modoOscuro.value == true
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Button(
+                        onClick = onLogout,
+                        colors = ButtonDefaults.buttonColors(containerColor = ColorError),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Logout, null, tint = Color.White,
+                            modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Cerrar sesión", color = Color.White, fontSize = 15.sp)
+                    }
+                }
             }
         },
-        bottomBar = {
-            AdminBottomBar(pagerState.currentPage, colores) { index ->
-                scope.launch { pagerState.animateScrollToPage(index) }
+        content = {
+            Scaffold(
+                containerColor = colores.fondo,
+                snackbarHost = {
+                    SnackbarHost(snackbarState) { data ->
+                        Snackbar(snackbarData = data,
+                            containerColor = colores.superficie,
+                            contentColor   = colores.texto,
+                            actionColor    = AdminAccent,
+                            shape          = RoundedCornerShape(12.dp))
+                    }
+                },
+                bottomBar = {
+                    AdminBottomBar(pagerState.currentPage, colores) { index ->
+                        scope.launch { pagerState.animateScrollToPage(index) }
+                    }
+                }
+            ) { padding ->
+                HorizontalPager(
+                    state             = pagerState,
+                    modifier          = Modifier.padding(padding).fillMaxSize(),
+                    userScrollEnabled = true
+                ) { pagina ->
+                    when (pagina) {
+                        0 -> AdminInicioTab(nombre, uiState, viewModel,
+                            onLogout, colores,
+                            drawerState = drawerState,
+                            onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
+                            onNavigateToNotificaciones = onNavigateToNotificaciones)
+                        1 -> AdminCitasTab(uiState, viewModel, colores)
+                        2 -> AdminBarberosTab(uiState, viewModel, colores)
+                        3 -> AdminServiciosTab(uiState, viewModel, colores)
+                        4 -> AdminHorariosTab(uiState, viewModel, colores)
+                        5 -> AdminResenasTab(uiState, viewModel, colores)
+                    }
+                }
             }
         }
-    ) { padding ->
-        HorizontalPager(
-            state             = pagerState,
-            modifier          = Modifier.padding(padding).fillMaxSize(),
-            userScrollEnabled = true
-        ) { pagina ->
-            when (pagina) {
-                0 -> AdminInicioTab(nombre, uiState, viewModel,
-                    onLogout, colores,
-                    onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
-                    onNavigateToNotificaciones = onNavigateToNotificaciones)
-                1 -> AdminCitasTab(uiState, viewModel, colores)
-                2 -> AdminBarberosTab(uiState, viewModel, colores)
-                3 -> AdminServiciosTab(uiState, viewModel, colores)
-                4 -> AdminHorariosTab(uiState, viewModel, colores)
-                5 -> AdminResenasTab(uiState, viewModel, colores)
-            }
-        }
-    }
+    )
 }
 
 // ── Bottom Bar ──────────────────────────────────────────────────────────────
@@ -168,10 +274,12 @@ private fun AdminInicioTab(
     viewModel: AdminViewModel,
     onLogout: () -> Unit,
     colores: BarberiaColores,
+    drawerState: DrawerState,
     onNavigateToTab: (Int) -> Unit,
     onNavigateToNotificaciones: () -> Unit = {}
 ) {
     var isRefreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -205,7 +313,7 @@ private fun AdminInicioTab(
                             Row(verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Box(modifier = Modifier.size(52.dp).clip(CircleShape)
-                                    .background(AdminAccent),
+                                    .background(AdminAccent).clickable { scope.launch { drawerState.open() } },
                                     contentAlignment = Alignment.Center) {
                                     Text(getInitials(nombre), color = Color.White,
                                         fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -240,22 +348,7 @@ private fun AdminInicioTab(
                                             tint = colores.textoSub, modifier = Modifier.size(22.dp))
                                     }
                                 }
-                                IconButton(onClick = { TemaManager.toggleModo() }) {
-                                    Icon(
-                                        imageVector = when (TemaManager.modoOscuro.value) {
-                                            null  -> Icons.Filled.BrightnessMedium
-                                            true  -> Icons.Filled.DarkMode
-                                            false -> Icons.Filled.LightMode
-                                        },
-                                        contentDescription = "Modo",
-                                        tint = colores.textoSub,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                IconButton(onClick = onLogout) {
-                                    Icon(Icons.AutoMirrored.Filled.Logout, null,
-                                        tint = colores.textoSub, modifier = Modifier.size(22.dp))
-                                }
+
                             }
                         }
                     }
@@ -333,6 +426,7 @@ private fun AdminCitasTab(
 ) {
     var citaACancelar by remember { mutableStateOf<CitaConDetalle?>(null) }
     var filtroEstado  by remember { mutableStateOf<EstadoCitaEnum?>(null) }
+    var citaDetalle   by remember { mutableStateOf<CitaConDetalle?>(null) }
     var isRefreshing  by remember { mutableStateOf(false) }
 
     val citasFiltradas = if (filtroEstado == null) uiState.citasConDetalles
@@ -360,25 +454,45 @@ private fun AdminCitasTab(
             }
 
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        FiltroChip("Todas", filtroEstado == null, AdminAccent, colores) {
-                            filtroEstado = null }
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(onClick = { expanded = true }) {
+                        Text(filtroEstado?.let {
+                            when (it) {
+                                EstadoCitaEnum.PENDIENTE -> "Filtrar · Pendientes"
+                                EstadoCitaEnum.EN_CURSO -> "Filtrar · En curso"
+                                EstadoCitaEnum.FINALIZADA -> "Filtrar · Finalizadas"
+                                EstadoCitaEnum.CANCELADA -> "Filtrar · Canceladas"
+                                EstadoCitaEnum.NO_PRESENTADO -> "Filtrar · No presentó"
+                            }
+                        } ?: "Filtrar", color = colores.texto, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Filled.ArrowDropDown, null, tint = colores.textoSub)
                     }
-                    items(EstadoCitaEnum.entries.toTypedArray()) { estado ->
-                        FiltroChip(
-                            texto = when (estado) {
-                                EstadoCitaEnum.PENDIENTE     -> "Pendientes"
-                                EstadoCitaEnum.EN_CURSO      -> "En curso"
-                                EstadoCitaEnum.FINALIZADA    -> "Finalizadas"
-                                EstadoCitaEnum.CANCELADA     -> "Canceladas"
-                                EstadoCitaEnum.NO_PRESENTADO -> "No presentó"
-                            },
-                            seleccionado = filtroEstado == estado,
-                            color        = AdminAccent,
-                            colores      = colores,
-                            onClick      = { filtroEstado = estado }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Todas",
+                                color = if (filtroEstado == null) AdminAccent else colores.texto) },
+                            onClick = { filtroEstado = null; expanded = false }
                         )
+                        EstadoCitaEnum.entries.forEach { estado ->
+                            DropdownMenuItem(
+                                text = { Text(
+                                    when (estado) {
+                                        EstadoCitaEnum.PENDIENTE -> "Pendientes"
+                                        EstadoCitaEnum.EN_CURSO -> "En curso"
+                                        EstadoCitaEnum.FINALIZADA -> "Finalizadas"
+                                        EstadoCitaEnum.CANCELADA -> "Canceladas"
+                                        EstadoCitaEnum.NO_PRESENTADO -> "No presentó"
+                                    },
+                                    color = if (filtroEstado == estado) AdminAccent else colores.texto
+                                )},
+                                onClick = { filtroEstado = estado; expanded = false }
+                            )
+                        }
                     }
                 }
             }
@@ -403,6 +517,7 @@ private fun AdminCitasTab(
                     TarjetaCitaAdmin(
                         detalle  = detalle,
                         colores  = colores,
+                        onClick  = { citaDetalle = detalle },
                         onCancelar = {
                             if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE ||
                                 detalle.cita.estado == EstadoCitaEnum.EN_CURSO)
@@ -433,6 +548,55 @@ private fun AdminCitasTab(
             dismissButton = {
                 TextButton(onClick = { citaACancelar = null }) {
                     Text("No", color = colores.textoSub) }
+            }
+        )
+    }
+
+    citaDetalle?.let { detalle ->
+        AlertDialog(
+            onDismissRequest = { citaDetalle = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = { Text("Cita #${detalle.cita.idCita}", color = colores.texto,
+                fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DetalleItem("Fecha", detalle.cita.fecha ?: "", Icons.Filled.CalendarMonth, colores)
+                    DetalleItem("Inicio", detalle.cita.horaInicio?.take(5) ?: "", Icons.Filled.Schedule, colores)
+                    DetalleItem("Fin", detalle.cita.horaFin?.take(5) ?: "", Icons.Filled.Schedule, colores)
+                    DetalleItem("Cliente", detalle.clienteNombre, Icons.Filled.Person, colores)
+                    DetalleItem("Barbero", detalle.barberoNombre, Icons.Filled.ContentCut, colores)
+                    DetalleItem("Servicio", detalle.servicioNombre, Icons.Filled.ShoppingBag, colores)
+                    DetalleItem("Estado", detalle.cita.estado?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "",
+                        Icons.Filled.Info, colores)
+                }
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    when (detalle.cita.estado) {
+                        EstadoCitaEnum.PENDIENTE -> {
+                            BarberiaBoton("Cancelar", colorFondo = ColorError, onClick = {
+                                viewModel.cancelarCita(detalle.cita.idCita!!)
+                                citaDetalle = null
+                            })
+                        }
+                        EstadoCitaEnum.EN_CURSO -> {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                BarberiaBoton("Finalizar", colorFondo = ColorVerde, onClick = {
+                                    viewModel.finalizarCita(detalle.cita.idCita!!)
+                                    citaDetalle = null
+                                })
+                                BarberiaBoton("No presentó", colorFondo = colores.textoSub, onClick = {
+                                    viewModel.noPresentoCita(detalle.cita.idCita!!)
+                                    citaDetalle = null
+                                })
+                            }
+                        }
+                        else -> {}
+                    }
+                    BarberiaBoton("Cerrar", colorFondo = AdminAccent, onClick = { citaDetalle = null })
+                }
             }
         )
     }
@@ -783,14 +947,27 @@ private fun AdminServiciosTab(
             }
 
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf(
-                        0 to "Todos", 1 to "Más populares",
-                        2 to "Precio bajo→alto", 3 to "Precio alto→bajo",
-                        4 to "Por tipo"
-                    )) { (idx, label) ->
-                        FiltroChip(label, filtroServicio == idx, ColorVerde, colores) {
-                            filtroServicio = idx
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(onClick = { expanded = true }) {
+                        Text("Ordenar", color = colores.texto, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Filled.ArrowDropDown, null, tint = colores.textoSub)
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        listOf(
+                            0 to "Todos", 1 to "Más populares",
+                            2 to "Precio bajo→alto", 3 to "Precio alto→bajo",
+                            4 to "Por tipo"
+                        ).forEach { (idx, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label,
+                                    color = if (filtroServicio == idx) ColorVerde else colores.texto) },
+                                onClick = { filtroServicio = idx; expanded = false }
+                            )
                         }
                     }
                 }
@@ -1745,6 +1922,7 @@ private fun FiltroChip(
 private fun TarjetaCitaAdmin(
     detalle: CitaConDetalle,
     colores: BarberiaColores,
+    onClick: () -> Unit = {},
     onCancelar: () -> Unit
 ) {
     val colorEstado = when (detalle.cita.estado) {
@@ -1755,7 +1933,7 @@ private fun TarjetaCitaAdmin(
         EstadoCitaEnum.NO_PRESENTADO -> colores.textoSub
         null                         -> colores.textoSub
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+    Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
         Row {
@@ -1767,7 +1945,8 @@ private fun TarjetaCitaAdmin(
                     verticalAlignment = Alignment.CenterVertically) {
                     Column {
                         Text(detalle.clienteNombre, color = colores.texto,
-                            fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("${detalle.cita.fecha} · ${detalle.cita.horaInicio?.take(5)}",
                             color = colores.textoSub, fontSize = 12.sp)
                     }
@@ -1832,7 +2011,8 @@ private fun TarjetaBarberoAdmin(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(barbero.nombre, color = colores.texto,
-                    fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                    fontWeight = FontWeight.Medium, fontSize = 14.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(barbero.especialidad ?: "Sin especialidad",
                     color = colores.textoSub, fontSize = 12.sp)
             }
@@ -1879,7 +2059,8 @@ private fun TarjetaServicioAdmin(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(servicio.nombre, color = colores.texto,
-                    fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                    fontWeight = FontWeight.Medium, fontSize = 14.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${servicio.duracionMinutos} min",
                     color = colores.textoSub, fontSize = 12.sp)
             }

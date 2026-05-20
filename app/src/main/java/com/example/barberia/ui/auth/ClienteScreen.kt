@@ -82,12 +82,6 @@ fun ClienteScreen(
     val snackbarState = remember { SnackbarHostState() }
     val colores = LocalBarberiaColores.current
 
-    val initials = remember(nombre) {
-        val ascii = Normalizer.normalize(nombre, Normalizer.Form.NFD)
-            .replace(Regex("[^\\p{ASCII}]"), "")
-        ascii.split(" ").take(2).joinToString("") { it.first().uppercase() }
-    }
-
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {
             snackbarState.showSnackbar(it)
@@ -114,65 +108,7 @@ fun ClienteScreen(
                 )
             }
         },
-        topBar = {
-            Surface(color = colores.fondo) {
-                Column {
-                    Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                        Brush.horizontalGradient(
-                            listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
-                        )))
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(modifier = Modifier.size(44.dp).clip(CircleShape)
-                            .background(ColorRojo.copy(0.15f))
-                            .border(1.5.dp, ColorRojo, CircleShape),
-                            contentAlignment = Alignment.Center) {
-                            Text(initials, color = ColorRojo,
-                                fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(nombre, color = colores.texto,
-                                fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text("Cliente", color = colores.textoSub, fontSize = 12.sp)
-                        }
-                        Spacer(Modifier.weight(1f))
-                        IconButton(onClick = { TemaManager.toggleModo() }) {
-                            Icon(
-                                imageVector = when (TemaManager.modoOscuro.value) {
-                                    null  -> Icons.Filled.BrightnessMedium
-                                    true  -> Icons.Filled.DarkMode
-                                    false -> Icons.Filled.LightMode
-                                },
-                                contentDescription = "Modo",
-                                tint = colores.textoSub,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        BadgedBox(badge = {
-                            if (uiState.notificaciones.isNotEmpty()) {
-                                Badge(containerColor = ColorRojo) {
-                                    Text("${uiState.notificaciones.size}",
-                                        color = Color.White, fontSize = 10.sp)
-                                }
-                            }
-                        }) {
-                            IconButton(onClick = onNavigateToNotificaciones) {
-                                Icon(Icons.Filled.Notifications, "Notificaciones",
-                                    tint = colores.texto, modifier = Modifier.size(22.dp))
-                            }
-                        }
-                        IconButton(onClick = onLogout) {
-                            Icon(Icons.AutoMirrored.Filled.Logout, "Cerrar sesión",
-                                tint = colores.textoSub, modifier = Modifier.size(20.dp))
-                        }
-                    }
-                }
-            }
-        },
+
         bottomBar = {
             NavigationBar(
                 containerColor = colores.superficie,
@@ -211,7 +147,7 @@ fun ClienteScreen(
             userScrollEnabled = true
         ) { pagina ->
             when (pagina) {
-                0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope)
+                0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones)
                 1 -> AgendarTab(uiState, viewModel, colores)
                 2 -> MisCitasTab(uiState, viewModel, colores)
             }
@@ -229,40 +165,144 @@ private fun InicioTab(
     viewModel: ClienteViewModel,
     colores: BarberiaColores,
     pagerState: androidx.compose.foundation.pager.PagerState,
-    scope: kotlinx.coroutines.CoroutineScope
+    scope: kotlinx.coroutines.CoroutineScope,
+    onLogout: () -> Unit,
+    onNavigateToNotificaciones: () -> Unit
 ) {
-    PullToRefreshBox(
-        isRefreshing = uiState.isLoading,
-        onRefresh = { viewModel.cargarDatosIniciales() }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
+    val initials = remember(nombre) {
+        val ascii = Normalizer.normalize(nombre, Normalizer.Form.NFD)
+            .replace(Regex("[^\\p{ASCII}]"), "")
+        ascii.split(" ").take(2).joinToString("") { it.first().uppercase() }
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (uiState.isLoading) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().height(200.dp),
-                        contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = ColorRojo,
-                            strokeWidth = 2.5.dp, modifier = Modifier.size(36.dp))
+            Box(modifier = Modifier.size(44.dp).clip(CircleShape)
+                .background(ColorRojo.copy(0.15f))
+                .border(1.5.dp, ColorRojo, CircleShape),
+                contentAlignment = Alignment.Center) {
+                Text(initials, color = ColorRojo,
+                    fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(nombre, color = colores.texto,
+                    fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Cliente", color = ColorRojo, fontSize = 12.sp)
+            }
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = { TemaManager.toggleModo() }) {
+                Icon(
+                    imageVector = when (TemaManager.modoOscuro.value) {
+                        null  -> Icons.Filled.BrightnessMedium
+                        true  -> Icons.Filled.DarkMode
+                        false -> Icons.Filled.LightMode
+                    },
+                    contentDescription = "Modo",
+                    tint = colores.textoSub,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            BadgedBox(badge = {
+                if (uiState.notificaciones.isNotEmpty()) {
+                    Badge(containerColor = ColorRojo) {
+                        Text("${uiState.notificaciones.size}",
+                            color = Color.White, fontSize = 10.sp)
                     }
                 }
-            } else {
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
+            }) {
+                IconButton(onClick = onNavigateToNotificaciones) {
+                    Icon(Icons.Filled.Notifications, "Notificaciones",
+                        tint = colores.texto, modifier = Modifier.size(22.dp))
                 }
+            }
+            IconButton(onClick = onLogout) {
+                Icon(Icons.AutoMirrored.Filled.Logout, "Cerrar sesión",
+                    tint = colores.textoSub, modifier = Modifier.size(20.dp))
+            }
+        }
+        PullToRefreshBox(
+            isRefreshing = uiState.isLoading,
+            onRefresh = { viewModel.cargarDatosIniciales() },
+            modifier = Modifier.weight(1f)
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+            ) {
+                if (uiState.isLoading) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().height(200.dp),
+                            contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = ColorRojo,
+                                strokeWidth = 2.5.dp, modifier = Modifier.size(36.dp))
+                        }
+                    }
+                } else {
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
 
-                // Barberos populares
-                item {
-                    SeccionTituloCliente("Nuestros Barberos", colores,
-                        modifier = Modifier.padding(horizontal = 20.dp))
-                    Spacer(modifier = Modifier.height(10.dp))
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(horizontal = 20.dp)
-                    ) {
-                        items(uiState.popularBarberos.ifEmpty { uiState.barberos }) { barbero ->
+                    // Barberos populares
+                    item {
+                        SeccionTituloCliente("Nuestros Barberos", colores,
+                            modifier = Modifier.padding(horizontal = 20.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(horizontal = 20.dp)
+                        ) {
+                            items(uiState.popularBarberos.ifEmpty { uiState.barberos }) { barbero ->
+                                Card(
+                                    modifier = Modifier.width(110.dp)
+                                        .shadow(4.dp, RoundedCornerShape(14.dp))
+                                        .clickable {
+                                            scope.launch { pagerState.animateScrollToPage(1) }
+                                        },
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = colores.superficie)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Box(modifier = Modifier.size(40.dp).clip(CircleShape)
+                                            .background(ColorRojo.copy(0.15f)),
+                                            contentAlignment = Alignment.Center) {
+                                            Text(barbero.nombre.take(2).uppercase(),
+                                                color = ColorRojo,
+                                                fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(barbero.nombre, color = colores.texto,
+                                            fontSize = 12.sp, textAlign = TextAlign.Center,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        barbero.especialidad?.let {
+                                            Text(it, color = colores.textoSub,
+                                                fontSize = 10.sp,
+                                                textAlign = TextAlign.Center)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(20.dp))
+                    }
+
+                    // Servicios populares (ordenados por precio ascendente)
+                    item {
+                        SeccionTituloCliente("Nuestros Servicios", colores,
+                            modifier = Modifier.padding(horizontal = 20.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    val serviciosOrdenados = uiState.popularServicios.ifEmpty {
+                        uiState.servicios.sortedBy { it.precio }
+                    }
+                    items(serviciosOrdenados) { servicio ->
+                        Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
                             Card(
-                                modifier = Modifier.width(110.dp)
+                                modifier = Modifier.fillMaxWidth()
                                     .shadow(4.dp, RoundedCornerShape(14.dp))
                                     .clickable {
                                         scope.launch { pagerState.animateScrollToPage(1) }
@@ -271,81 +311,35 @@ private fun InicioTab(
                                 colors = CardDefaults.cardColors(
                                     containerColor = colores.superficie)
                             ) {
-                                Column(modifier = Modifier.padding(12.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Box(modifier = Modifier.size(40.dp).clip(CircleShape)
-                                        .background(ColorRojo.copy(0.15f)),
-                                        contentAlignment = Alignment.Center) {
-                                        Text(barbero.nombre.take(2).uppercase(),
-                                            color = ColorRojo,
-                                            fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Row(modifier = Modifier.padding(16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Row(verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        modifier = Modifier.weight(1f)) {
+                                        Box(modifier = Modifier.size(40.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(ColorRojo.copy(0.1f)),
+                                            contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Filled.ContentCut, null,
+                                                tint = ColorRojo, modifier = Modifier.size(20.dp))
+                                        }
+                                        Column {
+                                            Text(servicio.nombre, color = colores.texto,
+                                                fontWeight = FontWeight.Medium, fontSize = 14.sp,
+                                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text("${servicio.duracionMinutos} min",
+                                                color = colores.textoSub, fontSize = 12.sp)
+                                        }
                                     }
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(barbero.nombre, color = colores.texto,
-                                        fontSize = 12.sp, textAlign = TextAlign.Center,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    barbero.especialidad?.let {
-                                        Text(it, color = colores.textoSub,
-                                            fontSize = 10.sp,
-                                            textAlign = TextAlign.Center)
-                                    }
+                                    Text("\$${servicio.precio.toInt()}", color = ColorRojo,
+                                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                 }
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(20.dp))
+                    item { Spacer(modifier = Modifier.height(20.dp)) }
                 }
-
-                // Servicios populares (ordenados por precio ascendente)
-                item {
-                    SeccionTituloCliente("Nuestros Servicios", colores,
-                        modifier = Modifier.padding(horizontal = 20.dp))
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
-
-                val serviciosOrdenados = uiState.popularServicios.ifEmpty {
-                    uiState.servicios.sortedBy { it.precio }
-                }
-                items(serviciosOrdenados) { servicio ->
-                    Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth()
-                                .shadow(4.dp, RoundedCornerShape(14.dp))
-                                .clickable {
-                                    scope.launch { pagerState.animateScrollToPage(1) }
-                                },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = colores.superficie)
-                        ) {
-                            Row(modifier = Modifier.padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Row(verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    modifier = Modifier.weight(1f)) {
-                                    Box(modifier = Modifier.size(40.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(ColorRojo.copy(0.1f)),
-                                        contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Filled.ContentCut, null,
-                                            tint = ColorRojo, modifier = Modifier.size(20.dp))
-                                    }
-                                    Column {
-                                        Text(servicio.nombre, color = colores.texto,
-                                            fontWeight = FontWeight.Medium, fontSize = 14.sp,
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text("${servicio.duracionMinutos} min",
-                                            color = colores.textoSub, fontSize = 12.sp)
-                                    }
-                                }
-                                Text("\$${servicio.precio.toInt()}", color = ColorRojo,
-                                    fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            }
-                        }
-                    }
-                }
-                item { Spacer(modifier = Modifier.height(20.dp)) }
             }
         }
     }
@@ -371,6 +365,8 @@ private fun AgendarTab(
     var mostrarExito          by remember { mutableStateOf(false) }
     var filtroEspecialidad    by remember { mutableStateOf<String?>(null) }
     var filtroServicioIdx     by remember { mutableIntStateOf(0) }
+    var expandidoEspecialidad by remember { mutableStateOf(false) }
+    var expandidoServicio     by remember { mutableStateOf(false) }
 
     val especialidades = remember(uiState.barberos) {
         uiState.barberos.mapNotNull { it.especialidad }.distinct().sorted()
@@ -605,33 +601,28 @@ private fun AgendarTab(
                 PasoTituloCliente("1. Elige tu barbero", colores)
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Chips de filtro por especialidad
+                // Filtro barbero por especialidad
                 if (especialidades.isNotEmpty()) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item {
-                            FilterChip(
-                                selected = filtroEspecialidad == null,
-                                onClick = { filtroEspecialidad = null },
-                                label = { Text("Todos", fontSize = 12.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ColorRojo,
-                                    selectedLabelColor = Color.White
-                                )
-                            )
+                    Box {
+                        Button(onClick = { expandidoEspecialidad = true }) {
+                            Text("Filtrar barbero ▼", fontSize = 13.sp)
                         }
-                        items(especialidades) { esp ->
-                            FilterChip(
-                                selected = filtroEspecialidad == esp,
-                                onClick = { filtroEspecialidad = esp },
-                                label = { Text(esp, fontSize = 12.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ColorRojo,
-                                    selectedLabelColor = Color.White
-                                )
+                        DropdownMenu(
+                            expanded = expandidoEspecialidad,
+                            onDismissRequest = { expandidoEspecialidad = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Todos") },
+                                onClick = { filtroEspecialidad = null; expandidoEspecialidad = false }
                             )
+                            especialidades.forEach { esp ->
+                                DropdownMenuItem(
+                                    text = { Text(esp) },
+                                    onClick = { filtroEspecialidad = esp; expandidoEspecialidad = false }
+                                )
+                            }
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -673,38 +664,25 @@ private fun AgendarTab(
                     PasoTituloCliente("2. Elige el servicio", colores)
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item {
-                            FilterChip(
-                                selected = filtroServicioIdx == 0,
-                                onClick = { filtroServicioIdx = 0 },
-                                label = { Text("Todos", fontSize = 12.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ColorRojo,
-                                    selectedLabelColor = Color.White
-                                )
-                            )
+                    Box {
+                        Button(onClick = { expandidoServicio = true }) {
+                            Text("Filtrar servicio ▼", fontSize = 13.sp)
                         }
-                        item {
-                            FilterChip(
-                                selected = filtroServicioIdx == 1,
-                                onClick = { filtroServicioIdx = 1 },
-                                label = { Text("Populares", fontSize = 12.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ColorRojo,
-                                    selectedLabelColor = Color.White
-                                )
+                        DropdownMenu(
+                            expanded = expandidoServicio,
+                            onDismissRequest = { expandidoServicio = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Todos") },
+                                onClick = { filtroServicioIdx = 0; expandidoServicio = false }
                             )
-                        }
-                        item {
-                            FilterChip(
-                                selected = filtroServicioIdx == 2,
-                                onClick = { filtroServicioIdx = 2 },
-                                label = { Text("Precio \u2191", fontSize = 12.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ColorRojo,
-                                    selectedLabelColor = Color.White
-                                )
+                            DropdownMenuItem(
+                                text = { Text("Populares") },
+                                onClick = { filtroServicioIdx = 1; expandidoServicio = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Precio ↑") },
+                                onClick = { filtroServicioIdx = 2; expandidoServicio = false }
                             )
                         }
                     }
@@ -875,6 +853,7 @@ private fun MisCitasTab(
     var citaParaResena by remember { mutableStateOf<CitaDTO?>(null) }
     var calificacion   by remember { mutableStateOf(5) }
     var comentario     by remember { mutableStateOf("") }
+    var citaDetalle by remember { mutableStateOf<CitaConDetalle?>(null) }
 
     val motivos = listOf(
         "Cambié de planes",
@@ -1022,6 +1001,62 @@ private fun MisCitasTab(
         )
     }
 
+    // Dialog detalle cita
+    citaDetalle?.let { detalle ->
+        val colorEstado = when (detalle.cita.estado) {
+            EstadoCitaEnum.PENDIENTE     -> ColorDorado
+            EstadoCitaEnum.EN_CURSO      -> ColorAzulClaro
+            EstadoCitaEnum.FINALIZADA    -> ColorVerde
+            EstadoCitaEnum.CANCELADA     -> ColorError
+            EstadoCitaEnum.NO_PRESENTADO -> colores.textoSub
+            null                         -> colores.textoSub
+        }
+        val textoEstado = when (detalle.cita.estado) {
+            EstadoCitaEnum.PENDIENTE     -> "Pendiente"
+            EstadoCitaEnum.EN_CURSO      -> "En curso"
+            EstadoCitaEnum.FINALIZADA    -> "Finalizada"
+            EstadoCitaEnum.CANCELADA     -> "Cancelada"
+            EstadoCitaEnum.NO_PRESENTADO -> "No presentó"
+            null -> ""
+        }
+        AlertDialog(
+            onDismissRequest = { citaDetalle = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = {
+                Text("Cita #${detalle.cita.idCita}",
+                    color = colores.texto, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CampoSoloLectura("Fecha", detalle.cita.fecha ?: "", Icons.Filled.CalendarMonth, colores)
+                    CampoSoloLectura("Hora", detalle.cita.horaInicio?.take(5) ?: "", Icons.Filled.AccessTime, colores)
+                    CampoSoloLectura("Barbero", detalle.barberoNombre, Icons.Filled.Person, colores)
+                    CampoSoloLectura("Servicio", detalle.servicioNombre, Icons.Filled.ContentCut, colores)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(colorEstado))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Estado: $textoEstado", color = colorEstado, fontSize = 14.sp)
+                    }
+                }
+            },
+            confirmButton = if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE) {
+                {
+                    BarberiaBoton("Cancelar cita", onClick = {
+                        citaDetalle = null
+                        citaParaCancelar = detalle
+                    })
+                }
+            } else null,
+            dismissButton = {
+                TextButton(onClick = { citaDetalle = null }) {
+                    Text("Cerrar", color = colores.textoSub)
+                }
+            }
+        )
+    }
+
     PullToRefreshBox(
         isRefreshing = uiState.isLoading,
         onRefresh = { viewModel.cargarDatosIniciales() }
@@ -1092,7 +1127,8 @@ private fun MisCitasTab(
                             if (detalle.cita.estado == EstadoCitaEnum.FINALIZADA) {
                                 citaParaResena = detalle.cita
                             }
-                        }
+                        },
+                        onClick    = { citaDetalle = detalle }
                     )
                 }
             }
@@ -1239,7 +1275,8 @@ private fun TarjetaCitaCliente(
     detalle: CitaConDetalle,
     colores: BarberiaColores,
     onCancelar: () -> Unit,
-    onResena: () -> Unit
+    onResena: () -> Unit,
+    onClick: () -> Unit
 ) {
     val cita = detalle.cita
     val colorEstado = when (cita.estado) {
@@ -1260,7 +1297,8 @@ private fun TarjetaCitaCliente(
     }
     Card(
         modifier = Modifier.fillMaxWidth()
-            .shadow(4.dp, RoundedCornerShape(14.dp)),
+            .shadow(4.dp, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie)
     ) {

@@ -3,9 +3,7 @@ package com.example.barberia.model
 import java.text.Normalizer
 
 fun getInitials(name: String): String {
-    val ascii = Normalizer.normalize(name, Normalizer.Form.NFD)
-        .replace(Regex("[^\\p{ASCII}]"), "")
-    return ascii.split(" ").filter { it.isNotBlank() }.take(2).joinToString("") { it.first().uppercase() }
+    return name.split(" ").take(2).joinToString("") { it.take(1).uppercase() }
 }
 
 // ── AUTH ───────────────────────────────────────────────────────────────────

@@ -9,20 +9,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-// Estado completo de la pantalla del administrador
 data class AdminUiState(
     val isLoading: Boolean = false,
     val todasLasCitas: List<CitaDTO> = emptyList(),
     val citasHoy: List<CitaDTO> = emptyList(),
+    val citasConDetalles: List<CitaConDetalle> = emptyList(),
     val barberos: List<BarberoDTO> = emptyList(),
     val servicios: List<ServicioDTO> = emptyList(),
+    val serviciosConDetalle: List<ServicioConDetalle> = emptyList(),
     val horarios: List<HorarioBarberoDTO> = emptyList(),
     val barberoSeleccionado: BarberoDTO? = null,
     val resenas: List<ResenaDTO> = emptyList(),
     val usuariosPorRol: List<UsuarioDTO> = emptyList(),
     val usuariosBarbero: List<UsuarioDTO> = emptyList(),
+    val todosUsuarios: List<UsuarioDTO> = emptyList(),
     val servicioEditando: ServicioDTO? = null,
     val horarioEditando: HorarioBarberoDTO? = null,
+    val notificacionesCount: Int = 0,
     val errorMessage: String? = null,
     val successMessage: String? = null
 )
@@ -45,29 +48,59 @@ class AdminViewModel(
 
     init { cargarDatosIniciales() }
 
-    // Carga todas las citas, barberos, servicios y usuarios BARBERO en paralelo
     fun cargarDatosIniciales() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val citas = apiService.getCitas()
-                val barberos = apiService.getBarberos()
-                val servicios = apiService.getServicios()
-                val barberosUsers = apiService.getUsuariosByRol("BARBERO")
+                val citasResponse = apiService.getCitas()
+                val barberosResponse = apiService.getBarberos()
+                val serviciosResponse = apiService.getServicios()
+                val barberosUsersResponse = apiService.getUsuariosByRol("BARBERO")
+                val usuariosResponse = apiService.getUsuarios()
 
-                val todasLasCitas = if (citas.isSuccessful) citas.body() ?: emptyList()
-                else emptyList()
+                val todasLasCitas = if (citasResponse.isSuccessful) citasResponse.body() ?: emptyList() else emptyList()
+                val barberos = if (barberosResponse.isSuccessful) barberosResponse.body() ?: emptyList() else emptyList()
+                val servicios = if (serviciosResponse.isSuccessful) serviciosResponse.body() ?: emptyList() else emptyList()
+                val usuariosBarbero = if (barberosUsersResponse.isSuccessful) barberosUsersResponse.body() ?: emptyList() else emptyList()
+                val todosUsuarios = if (usuariosResponse.isSuccessful) usuariosResponse.body() ?: emptyList() else emptyList()
+
+                val citasConDetalles = todasLasCitas.map { cita ->
+                    val barbero = barberos.find { it.idBarbero == cita.idBarbero }
+                    val servicio = servicios.find { it.idServicio == cita.idServicio }
+                    val usuario = todosUsuarios.find { it.idUsuario == cita.idUsuario }
+                    CitaConDetalle(
+                        cita = cita,
+                        clienteNombre = usuario?.nombre ?: "Desconocido",
+                        barberoNombre = barbero?.nombre ?: "Desconocido",
+                        servicioNombre = servicio?.nombre ?: "Desconocido",
+                        precio = servicio?.precio ?: 0.0
+                    )
+                }
+
+                val serviciosConDetalle = servicios.map { servicio ->
+                    val citasDelServicio = todasLasCitas.filter { it.idServicio == servicio.idServicio }
+                    val barberosIds = citasDelServicio.map { it.idBarbero }.distinct()
+                    val clientesIds = citasDelServicio.map { it.idUsuario }.distinct()
+                    ServicioConDetalle(
+                        servicio = servicio,
+                        barberoDTOs = barberos.filter { it.idBarbero in barberosIds },
+                        clienteDTOs = todosUsuarios.filter { it.idUsuario in clientesIds }
+                    )
+                }
+
+                val citasHoyList = todasLasCitas.filter { it.fecha == fechaHoy }
 
                 _uiState.value = _uiState.value.copy(
-                    isLoading      = false,
-                    todasLasCitas  = todasLasCitas,
-                    citasHoy       = todasLasCitas.filter { it.fecha == fechaHoy },
-                    barberos       = if (barberos.isSuccessful)
-                        barberos.body() ?: emptyList() else emptyList(),
-                    servicios      = if (servicios.isSuccessful)
-                        servicios.body() ?: emptyList() else emptyList(),
-                    usuariosBarbero = if (barberosUsers.isSuccessful)
-                        barberosUsers.body() ?: emptyList() else emptyList()
+                    isLoading            = false,
+                    todasLasCitas        = todasLasCitas,
+                    citasHoy             = citasHoyList,
+                    citasConDetalles     = citasConDetalles,
+                    barberos             = barberos,
+                    servicios            = servicios,
+                    serviciosConDetalle  = serviciosConDetalle,
+                    usuariosBarbero      = usuariosBarbero,
+                    todosUsuarios        = todosUsuarios,
+                    notificacionesCount  = citasHoyList.size
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -78,10 +111,21 @@ class AdminViewModel(
         }
     }
 
-    // ── Gestión de Barberos ───────────────────────────────────────────────
+    fun cargarServiciosConDetalle() {
+        val state = _uiState.value
+        val detalle = state.servicios.map { servicio ->
+            val citasDelServicio = state.todasLasCitas.filter { it.idServicio == servicio.idServicio }
+            val barberosIds = citasDelServicio.map { it.idBarbero }.distinct()
+            val clientesIds = citasDelServicio.map { it.idUsuario }.distinct()
+            ServicioConDetalle(
+                servicio = servicio,
+                barberoDTOs = state.barberos.filter { it.idBarbero in barberosIds },
+                clienteDTOs = state.todosUsuarios.filter { it.idUsuario in clientesIds }
+            )
+        }
+        _uiState.value = state.copy(serviciosConDetalle = detalle)
+    }
 
-    // PUT /api/barberos/{id} — activa o desactiva un barbero
-    // Al desactivar un barbero el backend cancela sus citas pendientes
     fun toggleActivoBarbero(barbero: BarberoDTO) {
         viewModelScope.launch {
             try {
@@ -106,19 +150,18 @@ class AdminViewModel(
         }
     }
 
-    // POST /api/barberos — crea un nuevo barbero vinculado a un usuario con rol BARBERO
     fun crearBarbero(nombre: String, especialidad: String, telefono: String, idUsuarioVinculado: Long? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val response = apiService.createBarbero(
                     BarberoDTO(
-                        idBarbero   = null,
-                        nombre      = nombre,
+                        idBarbero    = null,
+                        nombre       = nombre,
                         especialidad = especialidad.ifBlank { null },
-                        telefono    = telefono.ifBlank { null },
-                        activo      = true,
-                        idUsuario   = idUsuarioVinculado
+                        telefono     = telefono.ifBlank { null },
+                        activo       = true,
+                        idUsuario    = idUsuarioVinculado
                     )
                 )
                 if (response.isSuccessful) {
@@ -142,7 +185,47 @@ class AdminViewModel(
         }
     }
 
-    // DELETE /api/barberos/{id} — elimina un barbero
+    fun editarBarbero(id: Long, nombre: String, especialidad: String, telefono: String, idUsuario: Long?) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val response = apiService.updateBarbero(
+                    id,
+                    BarberoDTO(
+                        idBarbero    = id,
+                        nombre       = nombre,
+                        especialidad = especialidad.ifBlank { null },
+                        telefono     = telefono.ifBlank { null },
+                        activo       = true,
+                        idUsuario    = idUsuario
+                    )
+                )
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading      = false,
+                        successMessage = "Barbero '$nombre' actualizado correctamente"
+                    )
+                    cargarDatosIniciales()
+                } else if (response.code() == 409) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading    = false,
+                        errorMessage = "Este teléfono ya está registrado, usa otro"
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading    = false,
+                        errorMessage = "Error al actualizar barbero (${response.code()})"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading    = false,
+                    errorMessage = "Sin conexión."
+                )
+            }
+        }
+    }
+
     fun eliminarBarbero(idBarbero: Long) {
         viewModelScope.launch {
             try {
@@ -163,13 +246,7 @@ class AdminViewModel(
         }
     }
 
-    // ── Gestión de Servicios ──────────────────────────────────────────────
-
-    // POST /api/servicios — crea un nuevo servicio
-    fun crearServicio(
-        nombre: String, descripcion: String,
-        precio: Double, duracionMinutos: Int
-    ) {
+    fun crearServicio(nombre: String, descripcion: String, precio: Double, duracionMinutos: Int) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
@@ -203,7 +280,6 @@ class AdminViewModel(
         }
     }
 
-    // DELETE /api/servicios/{id} — elimina un servicio
     fun eliminarServicio(idServicio: Long) {
         viewModelScope.launch {
             try {
@@ -224,7 +300,6 @@ class AdminViewModel(
         }
     }
 
-    // PATCH /api/citas/{id}/cancelar — el admin puede cancelar cualquier cita
     fun cancelarCita(idCita: Long) {
         viewModelScope.launch {
             try {
@@ -244,8 +319,6 @@ class AdminViewModel(
             }
         }
     }
-
-    // ── Gestión de Horarios ──────────────────────────────────────────────
 
     fun seleccionarBarbero(barbero: BarberoDTO?) {
         _uiState.value = _uiState.value.copy(barberoSeleccionado = barbero)
@@ -314,8 +387,6 @@ class AdminViewModel(
         }
     }
 
-    // ── Servicios: Editar ────────────────────────────────────────────────
-
     fun iniciarEdicionServicio(servicio: ServicioDTO) {
         _uiState.value = _uiState.value.copy(servicioEditando = servicio)
     }
@@ -345,8 +416,6 @@ class AdminViewModel(
         }
     }
 
-    // ── Horarios: Editar ─────────────────────────────────────────────────
-
     fun iniciarEdicionHorario(horario: HorarioBarberoDTO) {
         _uiState.value = _uiState.value.copy(horarioEditando = horario)
     }
@@ -375,8 +444,6 @@ class AdminViewModel(
             }
         }
     }
-
-    // ── Reseñas ───────────────────────────────────────────────────────────
 
     fun cargarResenas() {
         viewModelScope.launch {
@@ -408,8 +475,6 @@ class AdminViewModel(
             }
         }
     }
-
-    // ── Usuarios por rol ─────────────────────────────────────────────────
 
     fun cargarUsuariosPorRol(rol: String) {
         viewModelScope.launch {

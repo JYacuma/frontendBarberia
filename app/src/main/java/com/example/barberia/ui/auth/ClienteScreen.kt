@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,48 +40,49 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.barberia.model.*
 import com.example.barberia.network.ApiService
-import com.example.barberia.ui.theme.BarberiaColores
-import com.example.barberia.ui.theme.ColorAzulClaro
-import com.example.barberia.ui.theme.ColorBlanco
-import com.example.barberia.ui.theme.ColorAzul
-import com.example.barberia.ui.theme.ColorDorado
-import com.example.barberia.ui.theme.ColorError
-import com.example.barberia.ui.theme.ColorRojo
-import com.example.barberia.ui.theme.ColorVerde
-import com.example.barberia.ui.theme.LocalBarberiaColores
-import com.example.barberia.ui.theme.TemaManager
+import com.example.barberia.ui.theme.*
 import com.example.barberia.viewmodel.ClienteViewModel
+import com.example.barberia.viewmodel.ClienteUiState
+
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
-import com.example.barberia.ui.theme.*
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import java.text.Normalizer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Create
 
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ClienteScreen(
     apiService: ApiService,
     idUsuario: Long,
     nombre: String,
-    onLogout: () -> Unit
-) {
-    val colores       = LocalBarberiaColores.current
-    val sistemaOscuro = isSystemInDarkTheme()
-
-    val viewModel: ClienteViewModel = viewModel(
-        key     = "cliente_$idUsuario",
-        factory = ClienteViewModel.factory(apiService, idUsuario)
-    )
+    onLogout: () -> Unit,
+    onNavigateToNotificaciones: () -> Unit = {}
+)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 4 tabs con swipe
-    val pagerState    = rememberPagerState(pageCount = { 4 })
+    val pagerState    = rememberPagerState(pageCount = { 3 })
     val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
+
+    val initials = remember(nombre) {
+        val ascii = Normalizer.normalize(nombre, Normalizer.Form.NFD)
+            .replace(Regex("[^\\p{ASCII}]"), "")
+        ascii.split(" ").take(2).joinToString("") { it.first().uppercase() }
+    }
 
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {
@@ -108,6 +110,65 @@ fun ClienteScreen(
                 )
             }
         },
+        topBar = {
+            Surface(color = colores.fondo) {
+                Column {
+                    Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+                        Brush.horizontalGradient(
+                            listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
+                        )))
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.size(44.dp).clip(CircleShape)
+                            .background(ColorRojo.copy(0.15f))
+                            .border(1.5.dp, ColorRojo, CircleShape),
+                            contentAlignment = Alignment.Center) {
+                            Text(initials, color = ColorRojo,
+                                fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(nombre, color = colores.texto,
+                                fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("Cliente", color = colores.textoSub, fontSize = 12.sp)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { TemaManager.toggleModo() }) {
+                            Icon(
+                                imageVector = when (TemaManager.modoOscuro.value) {
+                                    null  -> Icons.Filled.BrightnessMedium
+                                    true  -> Icons.Filled.DarkMode
+                                    false -> Icons.Filled.LightMode
+                                },
+                                contentDescription = "Modo",
+                                tint = colores.textoSub,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        BadgedBox(badge = {
+                            if (uiState.notificaciones.isNotEmpty()) {
+                                Badge(containerColor = ColorRojo) {
+                                    Text("${uiState.notificaciones.size}",
+                                        color = Color.White, fontSize = 10.sp)
+                                }
+                            }
+                        }) {
+                            IconButton(onClick = onNavigateToNotificaciones) {
+                                Icon(Icons.Filled.Notifications, "Notificaciones",
+                                    tint = colores.texto, modifier = Modifier.size(22.dp))
+                            }
+                        }
+                        IconButton(onClick = onLogout) {
+                            Icon(Icons.AutoMirrored.Filled.Logout, "Cerrar sesión",
+                                tint = colores.textoSub, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+        },
         bottomBar = {
             NavigationBar(
                 containerColor = colores.superficie,
@@ -119,8 +180,7 @@ fun ClienteScreen(
                 listOf(
                     Triple("Inicio",   Icons.Filled.Home,          0),
                     Triple("Agendar",  Icons.Filled.CalendarMonth, 1),
-                    Triple("Mis Citas",Icons.Filled.List,           2),
-                    Triple("Perfil",   Icons.Filled.Person,         3)
+                    Triple("Mis Citas",Icons.Filled.List,           2)
                 ).forEach { (label, icon, index) ->
                     val activo = pagerState.currentPage == index
                     NavigationBarItem(
@@ -147,180 +207,181 @@ fun ClienteScreen(
             userScrollEnabled = true
         ) { pagina ->
             when (pagina) {
-                0 -> InicioTab(nombre, uiState, onLogout, colores, sistemaOscuro)
+                0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope)
                 1 -> AgendarTab(uiState, viewModel, colores)
                 2 -> MisCitasTab(uiState, viewModel, colores)
-                3 -> PerfilTab(uiState, viewModel, onLogout, colores, sistemaOscuro)
             }
         }
     }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 1 — INICIO
+// TAB 0 — INICIO
 // ══════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun InicioTab(
     nombre: String,
-    uiState: com.example.barberia.viewmodel.ClienteUiState,
-    onLogout: () -> Unit,
+    uiState: ClienteUiState,
+    viewModel: ClienteViewModel,
     colores: BarberiaColores,
-    sistemaOscuro: Boolean
+    pagerState: androidx.compose.foundation.pager.PagerState,
+    scope: kotlinx.coroutines.CoroutineScope
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
+    PullToRefreshBox(
+        isRefreshing = uiState.isLoading,
+        onRefresh = { viewModel.cargarDatosIniciales() }
     ) {
-        item {
-            Box(modifier = Modifier.fillMaxWidth().background(
-                Brush.verticalGradient(
-                    if (colores.esModoOscuro)
-                        listOf(Color(0xFF1A0505), colores.fondo)
-                    else
-                        listOf(Color(0xFFFFF5F5), colores.fondo)
-                )
-            )) {
-                Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                    Brush.horizontalGradient(
-                        listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
-                    )))
-                Column(modifier = Modifier.padding(
-                    start = 20.dp, end = 20.dp, top = 52.dp, bottom = 20.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Box(modifier = Modifier.size(8.dp).clip(CircleShape)
-                                    .background(ColorRojo))
-                                Text("CLIENTE", color = ColorRojo, fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Hola, $nombre", color = colores.texto,
-                                fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            Text("¿Qué servicio deseas hoy?",
-                                color = colores.textoSub, fontSize = 13.sp)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(modifier = Modifier.size(44.dp).clip(CircleShape)
-                                .background(ColorRojo.copy(0.15f))
-                                .border(1.5.dp, ColorRojo, CircleShape),
-                                contentAlignment = Alignment.Center) {
-                                Text(nombre.take(2).uppercase(), color = ColorRojo,
-                                    fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-                            IconButton(onClick = {
-                                TemaManager.modoOscuro.value = when (TemaManager.modoOscuro.value) {
-                                    null  -> !colores.esModoOscuro
-                                    true  -> false
-                                    false -> null
-                                }
-                            }) {
-                                Icon(
-                                    imageVector = when (TemaManager.modoOscuro.value) {
-                                        null  -> Icons.Filled.BrightnessMedium
-                                        true  -> Icons.Filled.DarkMode
-                                        false -> Icons.Filled.LightMode
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(colores.fondo)
+        ) {
+            if (uiState.isLoading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp),
+                        contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = ColorRojo,
+                            strokeWidth = 2.5.dp, modifier = Modifier.size(36.dp))
+                    }
+                }
+            } else {
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                // Barberos populares
+                item {
+                    SeccionTituloCliente("Nuestros Barberos", colores,
+                        modifier = Modifier.padding(horizontal = 20.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(horizontal = 20.dp)
+                    ) {
+                        items(uiState.popularBarberos.ifEmpty { uiState.barberos }) { barbero ->
+                            Card(
+                                modifier = Modifier.width(110.dp)
+                                    .shadow(4.dp, RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        scope.launch { pagerState.animateScrollToPage(1) }
                                     },
-                                    contentDescription = "Modo",
-                                    tint = colores.textoSub,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = colores.superficie)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(modifier = Modifier.size(40.dp).clip(CircleShape)
+                                        .background(ColorRojo.copy(0.15f)),
+                                        contentAlignment = Alignment.Center) {
+                                        Text(barbero.nombre.take(2).uppercase(),
+                                            color = ColorRojo,
+                                            fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(barbero.nombre, color = colores.texto,
+                                        fontSize = 12.sp, textAlign = TextAlign.Center,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    barbero.especialidad?.let {
+                                        Text(it, color = colores.textoSub,
+                                            fontSize = 10.sp,
+                                            textAlign = TextAlign.Center)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+
+                // Servicios populares (ordenados por precio ascendente)
+                item {
+                    SeccionTituloCliente("Nuestros Servicios", colores,
+                        modifier = Modifier.padding(horizontal = 20.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
+                val serviciosOrdenados = uiState.popularServicios.ifEmpty {
+                    uiState.servicios.sortedBy { it.precio }
+                }
+                items(serviciosOrdenados) { servicio ->
+                    Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth()
+                                .shadow(4.dp, RoundedCornerShape(14.dp))
+                                .clickable {
+                                    scope.launch { pagerState.animateScrollToPage(1) }
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = colores.superficie)
+                        ) {
+                            Row(modifier = Modifier.padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.weight(1f)) {
+                                    Box(modifier = Modifier.size(40.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(ColorRojo.copy(0.1f)),
+                                        contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Filled.ContentCut, null,
+                                            tint = ColorRojo, modifier = Modifier.size(20.dp))
+                                    }
+                                    Column {
+                                        Text(servicio.nombre, color = colores.texto,
+                                            fontWeight = FontWeight.Medium, fontSize = 14.sp,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("${servicio.duracionMinutos} min",
+                                            color = colores.textoSub, fontSize = 12.sp)
+                                    }
+                                }
+                                Text("\$${servicio.precio.toInt()}", color = ColorRojo,
+                                    fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             }
                         }
                     }
                 }
+                item { Spacer(modifier = Modifier.height(20.dp)) }
             }
-        }
-
-        if (uiState.isLoading) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().height(200.dp),
-                    contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = ColorRojo,
-                        strokeWidth = 2.5.dp, modifier = Modifier.size(36.dp))
-                }
-            }
-        } else {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                // Banner rojo
-                Box(modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Brush.horizontalGradient(
-                        listOf(ColorRojo, ColorRojoClaro)))) {
-                    Row(modifier = Modifier.padding(20.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.ContentCut, null,
-                            tint = Color.White, modifier = Modifier.size(36.dp))
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text("Reserva tu cita", color = Color.White,
-                                fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Text("Elige tu barbero favorito",
-                                color = Color.White.copy(0.8f), fontSize = 13.sp)
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(20.dp))
-            }
-
-            // Barberos activos
-            item {
-                Row(modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    SeccionTituloCliente("Nuestros Barberos", colores)
-                    Text("${uiState.barberos.size} disponibles",
-                        color = colores.textoSub, fontSize = 12.sp)
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(horizontal = 20.dp)
-                ) {
-                    items(uiState.barberos) { barbero ->
-                        TarjetaBarberoCliente(barbero, colores)
-                    }
-                }
-                Spacer(modifier = Modifier.height(20.dp))
-            }
-
-            // Servicios
-            item {
-                SeccionTituloCliente("Servicios", colores,
-                    modifier = Modifier.padding(horizontal = 20.dp))
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
-            items(uiState.servicios) { servicio ->
-                Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
-                    TarjetaServicioCliente(servicio, colores)
-                }
-            }
-            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
     }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 2 — AGENDAR
+// TAB 1 — AGENDAR
 // ══════════════════════════════════════════════════════════════════════════════
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AgendarTab(
-    uiState: com.example.barberia.viewmodel.ClienteUiState,
+    uiState: ClienteUiState,
     viewModel: ClienteViewModel,
     colores: BarberiaColores
 ) {
-    var barberoSeleccionado  by remember { mutableStateOf<BarberoDTO?>(null) }
-    var servicioSeleccionado by remember { mutableStateOf<ServicioDTO?>(null) }
-    var fechaSeleccionada    by remember { mutableStateOf("") }
-    var horaSeleccionada     by remember { mutableStateOf("") }
-    var mostrarCalendario    by remember { mutableStateOf(false) }
+    var pasoAgenda            by remember { mutableIntStateOf(0) }
+    var barberoSeleccionado   by remember { mutableStateOf<BarberoDTO?>(null) }
+    var servicioSeleccionado  by remember { mutableStateOf<ServicioDTO?>(null) }
+    var fechaSeleccionada     by remember { mutableStateOf("") }
+    var horaSeleccionada      by remember { mutableStateOf("") }
+    var mostrarCalendario     by remember { mutableStateOf(false) }
+    var mostrarDialogoBarbero by remember { mutableStateOf<BarberoDTO?>(null) }
+    var mostrarExito          by remember { mutableStateOf(false) }
+    var filtroEspecialidad    by remember { mutableStateOf<String?>(null) }
+    var filtroServicioIdx     by remember { mutableIntStateOf(0) }
+
+    val especialidades = remember(uiState.barberos) {
+        uiState.barberos.mapNotNull { it.especialidad }.distinct().sorted()
+    }
+    val barberosFiltrados = remember(filtroEspecialidad, uiState.barberos) {
+        if (filtroEspecialidad.isNullOrBlank()) uiState.barberos
+        else uiState.barberos.filter { it.especialidad == filtroEspecialidad }
+    }
+    val serviciosFiltrados = remember(filtroServicioIdx, uiState.servicios) {
+        when (filtroServicioIdx) {
+            1 -> uiState.servicios.sortedBy { it.precio }
+            2 -> uiState.servicios.sortedByDescending { it.precio }
+            else -> uiState.servicios
+        }
+    }
 
     val hoy = remember {
         java.util.Calendar.getInstance().apply {
@@ -341,7 +402,6 @@ private fun AgendarTab(
         }
     )
 
-    // Convierte millis UTC a "YYYY-MM-DD" ajustando zona horaria local
     fun millisAFecha(millis: Long): String {
         val cal = java.util.Calendar.getInstance().apply {
             timeInMillis = millis + timeZone.getOffset(millis)
@@ -361,6 +421,7 @@ private fun AgendarTab(
                     datePickerState.selectedDateMillis?.let {
                         fechaSeleccionada = millisAFecha(it)
                         horaSeleccionada = ""
+                        pasoAgenda = 3
                         barberoSeleccionado?.idBarbero?.let { id ->
                             viewModel.cargarDisponibilidad(id, fechaSeleccionada)
                         }
@@ -397,271 +458,506 @@ private fun AgendarTab(
             )) }
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    // Dialog perfil barbero
+    mostrarDialogoBarbero?.let { barbero ->
+        val bInitials = remember(barbero.nombre) {
+            val ascii = Normalizer.normalize(barbero.nombre, Normalizer.Form.NFD)
+                .replace(Regex("[^\\p{ASCII}]"), "")
+            ascii.split(" ").take(2).joinToString("") { it.first().uppercase() }
+        }
+        AlertDialog(
+            onDismissRequest = { mostrarDialogoBarbero = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()) {
+                    Box(modifier = Modifier.size(64.dp).clip(CircleShape)
+                        .background(ColorRojo.copy(0.15f))
+                        .border(2.dp, ColorRojo, CircleShape),
+                        contentAlignment = Alignment.Center) {
+                        Text(bInitials, color = ColorRojo,
+                            fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(barbero.nombre, color = colores.texto,
+                        fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()) {
+                    barbero.especialidad?.let {
+                        Box(modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                            .background(ColorRojo.copy(0.1f))
+                            .padding(horizontal = 16.dp, vertical = 6.dp)) {
+                            Text(it, color = ColorRojo, fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                BarberiaBoton("Confirmar selección", onClick = {
+                    barberoSeleccionado = barbero
+                    horaSeleccionada = ""
+                    pasoAgenda = 1
+                    viewModel.limpiarDisponibilidad()
+                    if (fechaSeleccionada.length == 10)
+                        viewModel.cargarDisponibilidad(
+                            barbero.idBarbero!!, fechaSeleccionada)
+                    mostrarDialogoBarbero = null
+                })
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarDialogoBarbero = null }) {
+                    Text("Cancelar", color = colores.textoSub)
+                }
+            }
+        )
+    }
+
+    // Dialog exito
+    if (mostrarExito) {
+        AlertDialog(
+            onDismissRequest = { mostrarExito = false },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.CheckCircle, null,
+                        tint = ColorVerde, modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("¡Cita agendada!", color = colores.texto,
+                        fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    barberoSeleccionado?.let {
+                        Text("Barbero: ${it.nombre}",
+                            color = colores.texto, fontSize = 14.sp)
+                    }
+                    servicioSeleccionado?.let {
+                        Text("Servicio: ${it.nombre} - \$${it.precio.toInt()}",
+                            color = colores.texto, fontSize = 14.sp)
+                    }
+                    if (fechaSeleccionada.isNotBlank())
+                        Text("Fecha: $fechaSeleccionada",
+                            color = colores.texto, fontSize = 14.sp)
+                    if (horaSeleccionada.isNotBlank())
+                        Text("Hora: ${horaSeleccionada.take(5)}",
+                            color = colores.texto, fontSize = 14.sp)
+                }
+            },
+            confirmButton = {
+                BarberiaBoton("Aceptar", onClick = {
+                    mostrarExito = false
+                    barberoSeleccionado = null
+                    servicioSeleccionado = null
+                    fechaSeleccionada = ""
+                    horaSeleccionada = ""
+                    pasoAgenda = 0
+                })
+            }
+        )
+    }
+
+    PullToRefreshBox(
+        isRefreshing = uiState.isLoading,
+        onRefresh = { viewModel.cargarDatosIniciales() }
     ) {
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("Agendar Cita", color = colores.texto,
-                fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("Sigue los pasos para reservar", color = colores.textoSub, fontSize = 13.sp)
-        }
-
-        // Paso 1 — Barbero
-        item {
-            PasoTituloCliente("1. Elige tu barbero", colores)
-            Spacer(modifier = Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(uiState.barberos) { barbero ->
-                    val sel = barberoSeleccionado?.idBarbero == barbero.idBarbero
-                    Card(modifier = Modifier.width(110.dp).clickable {
-                        barberoSeleccionado = barbero
-                        horaSeleccionada = ""
-                        viewModel.limpiarDisponibilidad()
-                        if (fechaSeleccionada.length == 10)
-                            viewModel.cargarDisponibilidad(
-                                barbero.idBarbero!!, fechaSeleccionada)
-                    },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (sel) ColorRojo else colores.superficie),
-                        elevation = CardDefaults.cardElevation(
-                            defaultElevation = colores.sombra.dp)) {
-                        Column(modifier = Modifier.padding(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(modifier = Modifier.size(40.dp).clip(CircleShape)
-                                .background(if (sel) Color.White.copy(0.2f)
-                                else ColorRojo.copy(0.15f)),
-                                contentAlignment = Alignment.Center) {
-                                Text(barbero.nombre.take(2).uppercase(),
-                                    color = if (sel) Color.White else ColorRojo,
-                                    fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(barbero.nombre,
-                                color = if (sel) Color.White else colores.texto,
-                                fontSize = 12.sp, textAlign = TextAlign.Center,
-                                maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            barbero.especialidad?.let {
-                                Text(it,
-                                    color = if (sel) Color.White.copy(0.7f)
-                                    else colores.textoSub,
-                                    fontSize = 10.sp, textAlign = TextAlign.Center)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Paso 2 — Servicio
-        item {
-            PasoTituloCliente("2. Elige el servicio", colores)
-            Spacer(modifier = Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                uiState.servicios.forEach { servicio ->
-                    val sel = servicioSeleccionado?.idServicio == servicio.idServicio
-                    Card(modifier = Modifier.fillMaxWidth().clickable {
-                        servicioSeleccionado = servicio },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (sel) ColorRojo else colores.superficie),
-                        elevation = CardDefaults.cardElevation(
-                            defaultElevation = colores.sombra.dp)) {
-                        Row(modifier = Modifier.padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(servicio.nombre,
-                                    color = if (sel) Color.White else colores.texto,
-                                    fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                Text("${servicio.duracionMinutos} min",
-                                    color = if (sel) Color.White.copy(0.7f)
-                                    else colores.textoSub, fontSize = 12.sp)
-                            }
-                            Text("\$${servicio.precio.toInt()}",
-                                color = if (sel) Color.White else ColorRojo,
-                                fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Paso 3 — Fecha
-        item {
-            PasoTituloCliente("3. Elige la fecha", colores)
-            Spacer(modifier = Modifier.height(8.dp))
-            Box(modifier = Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(colores.superficie)
-                .border(1.dp,
-                    if (fechaSeleccionada.isNotBlank()) ColorRojo else colores.borde,
-                    RoundedCornerShape(14.dp))
-                .clickable { mostrarCalendario = true }
-                .padding(horizontal = 16.dp, vertical = 16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(Icons.Filled.CalendarMonth, null,
-                        tint = ColorRojo, modifier = Modifier.size(22.dp))
-                    Text(
-                        text = if (fechaSeleccionada.isNotBlank()) fechaSeleccionada
-                        else "Toca para abrir el calendario",
-                        color = if (fechaSeleccionada.isNotBlank()) colores.texto
-                        else colores.textoSub,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-        }
-
-        // Paso 4 — Hora
-        val fechaHoy = java.util.Calendar.getInstance().let {
-            "%d-%02d-%02d".format(it.get(java.util.Calendar.YEAR),
-                it.get(java.util.Calendar.MONTH) + 1,
-                it.get(java.util.Calendar.DAY_OF_MONTH))
-        }
-        val horaActual = java.util.Calendar.getInstance().let {
-            "%02d:%02d".format(it.get(java.util.Calendar.HOUR_OF_DAY),
-                it.get(java.util.Calendar.MINUTE))
-        }
-        val horasFiltradas = if (fechaSeleccionada == fechaHoy) {
-            uiState.horasDisponibles.filter { it.take(5) > horaActual }
-        } else {
-            uiState.horasDisponibles
-        }
-
-        if (uiState.horasDisponibles.isNotEmpty() && horasFiltradas.isEmpty()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(colores.fondo)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             item {
-                PasoTituloCliente("4. Elige la hora", colores)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text("No hay horas disponibles para hoy después de las $horaActual",
-                    color = colores.textoSub, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Agendar Cita", color = colores.texto,
+                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Sigue los pasos para reservar", color = colores.textoSub, fontSize = 13.sp)
             }
-        }
 
-        if (horasFiltradas.isNotEmpty()) {
+            // Paso 1 — Barbero con filtro por especialidad
             item {
-                PasoTituloCliente("4. Elige la hora", colores)
+                PasoTituloCliente("1. Elige tu barbero", colores)
                 Spacer(modifier = Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(horasFiltradas) { hora ->
-                        val horaCorta = hora.take(5)
-                        val sel       = horaSeleccionada == hora
-                        Box(modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (sel) ColorRojo else colores.superficie)
-                            .border(1.dp,
-                                if (sel) ColorRojo else colores.borde,
-                                RoundedCornerShape(10.dp))
-                            .clickable { horaSeleccionada = hora }
-                            .padding(horizontal = 16.dp, vertical = 10.dp)) {
-                            Text(horaCorta,
-                                color = if (sel) Color.White else colores.texto,
-                                fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 13.sp)
+
+                // Chips de filtro por especialidad
+                if (especialidades.isNotEmpty()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item {
+                            FilterChip(
+                                selected = filtroEspecialidad == null,
+                                onClick = { filtroEspecialidad = null },
+                                label = { Text("Todos", fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ColorRojo,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                        items(especialidades) { esp ->
+                            FilterChip(
+                                selected = filtroEspecialidad == esp,
+                                onClick = { filtroEspecialidad = esp },
+                                label = { Text(esp, fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ColorRojo,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(barberosFiltrados) { barbero ->
+                        Card(
+                            modifier = Modifier.width(110.dp)
+                                .shadow(4.dp, RoundedCornerShape(14.dp))
+                                .clickable { mostrarDialogoBarbero = barbero },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = colores.superficie)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(modifier = Modifier.size(40.dp).clip(CircleShape)
+                                    .background(ColorRojo.copy(0.15f)),
+                                    contentAlignment = Alignment.Center) {
+                                    Text(barbero.nombre.take(2).uppercase(),
+                                        color = ColorRojo,
+                                        fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(barbero.nombre, color = colores.texto,
+                                    fontSize = 12.sp, textAlign = TextAlign.Center,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                barbero.especialidad?.let {
+                                    Text(it, color = colores.textoSub,
+                                        fontSize = 10.sp, textAlign = TextAlign.Center)
+                                }
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // Botón confirmar
-        item {
-            val listo = barberoSeleccionado != null &&
-                    servicioSeleccionado != null &&
-                    fechaSeleccionada.length == 10 &&
-                    horaSeleccionada.isNotBlank()
+            // Paso 2 — Servicio con filtros
+            if (barberoSeleccionado != null) {
+                item {
+                    PasoTituloCliente("2. Elige el servicio", colores)
+                    Spacer(modifier = Modifier.height(8.dp))
 
-            BarberiaBoton(
-                texto      = "Confirmar Cita",
-                icono      = Icons.Filled.CheckCircle,
-                isLoading  = uiState.isLoading,
-                colorFondo = if (listo) ColorRojo else colores.borde,
-                onClick    = {
-                    if (listo) {
-                        viewModel.agendarCita(
-                            idBarbero  = barberoSeleccionado!!.idBarbero!!,
-                            idServicio = servicioSeleccionado!!.idServicio!!,
-                            fecha      = fechaSeleccionada,
-                            horaInicio = horaSeleccionada
-                        )
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item {
+                            FilterChip(
+                                selected = filtroServicioIdx == 0,
+                                onClick = { filtroServicioIdx = 0 },
+                                label = { Text("Todos", fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ColorRojo,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                        item {
+                            FilterChip(
+                                selected = filtroServicioIdx == 1,
+                                onClick = { filtroServicioIdx = 1 },
+                                label = { Text("Populares", fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ColorRojo,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                        item {
+                            FilterChip(
+                                selected = filtroServicioIdx == 2,
+                                onClick = { filtroServicioIdx = 2 },
+                                label = { Text("Precio \u2191", fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ColorRojo,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        serviciosFiltrados.forEach { servicio ->
+                            val sel = servicioSeleccionado?.idServicio == servicio.idServicio
+                            Card(
+                                modifier = Modifier.fillMaxWidth()
+                                    .shadow(4.dp, RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        servicioSeleccionado = servicio
+                                        pasoAgenda = 2
+                                    },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (sel) ColorRojo else colores.superficie)
+                            ) {
+                                Row(modifier = Modifier.padding(16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(servicio.nombre,
+                                            color = if (sel) Color.White else colores.texto,
+                                            fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                        Text("${servicio.duracionMinutos} min",
+                                            color = if (sel) Color.White.copy(0.7f)
+                                            else colores.textoSub, fontSize = 12.sp)
+                                    }
+                                    Text("\$${servicio.precio.toInt()}",
+                                        color = if (sel) Color.White else ColorRojo,
+                                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                }
+                            }
+                        }
                     }
                 }
-            )
-            Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            // Paso 3 — Fecha
+            if (servicioSeleccionado != null) {
+                item {
+                    PasoTituloCliente("3. Elige la fecha", colores)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.fillMaxWidth()
+                        .shadow(4.dp, RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(colores.superficie)
+                        .clickable { mostrarCalendario = true }
+                        .padding(horizontal = 16.dp, vertical = 16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Icon(Icons.Filled.CalendarMonth, null,
+                                tint = ColorRojo, modifier = Modifier.size(22.dp))
+                            Text(
+                                text = if (fechaSeleccionada.isNotBlank()) fechaSeleccionada
+                                else "Toca para abrir el calendario",
+                                color = if (fechaSeleccionada.isNotBlank()) colores.texto
+                                else colores.textoSub,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Paso 4 — Hora
+            if (fechaSeleccionada.isNotBlank()) {
+                val fechaHoy = java.util.Calendar.getInstance().let {
+                    "%d-%02d-%02d".format(it.get(java.util.Calendar.YEAR),
+                        it.get(java.util.Calendar.MONTH) + 1,
+                        it.get(java.util.Calendar.DAY_OF_MONTH))
+                }
+                val horaActual = java.util.Calendar.getInstance().let {
+                    "%02d:%02d".format(it.get(java.util.Calendar.HOUR_OF_DAY),
+                        it.get(java.util.Calendar.MINUTE))
+                }
+                val horasFiltradas = if (fechaSeleccionada == fechaHoy) {
+                    uiState.horasDisponibles.filter { it.take(5) > horaActual }
+                } else {
+                    uiState.horasDisponibles
+                }
+
+                if (horasFiltradas.isEmpty() && uiState.horasDisponibles.isNotEmpty()) {
+                    item {
+                        PasoTituloCliente("4. Elige la hora", colores)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("No hay horas disponibles para hoy después de las $horaActual",
+                            color = colores.textoSub, fontSize = 13.sp)
+                    }
+                }
+
+                if (horasFiltradas.isNotEmpty()) {
+                    item {
+                        PasoTituloCliente("4. Elige la hora", colores)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(horasFiltradas) { hora ->
+                                val horaCorta = hora.take(5)
+                                val sel       = horaSeleccionada == hora
+                                Box(modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (sel) ColorRojo else colores.superficie)
+                                    .border(1.dp,
+                                        if (sel) ColorRojo else colores.borde,
+                                        RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        horaSeleccionada = hora
+                                        pasoAgenda = 4
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 10.dp)) {
+                                    Text(horaCorta,
+                                        color = if (sel) Color.White else colores.texto,
+                                        fontWeight = if (sel) FontWeight.Bold
+                                        else FontWeight.Normal,
+                                        fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Botón confirmar
+            item {
+                val listo = barberoSeleccionado != null &&
+                        servicioSeleccionado != null &&
+                        fechaSeleccionada.length == 10 &&
+                        horaSeleccionada.isNotBlank()
+
+                BarberiaBoton(
+                    texto      = "Confirmar Cita",
+                    icono      = Icons.Filled.CheckCircle,
+                    isLoading  = uiState.isLoading,
+                    colorFondo = if (listo) ColorRojo else colores.borde,
+                    onClick    = {
+                        if (listo) {
+                            viewModel.agendarCita(
+                                idBarbero  = barberoSeleccionado!!.idBarbero!!,
+                                idServicio = servicioSeleccionado!!.idServicio!!,
+                                fecha      = fechaSeleccionada,
+                                horaInicio = horaSeleccionada
+                            )
+                            mostrarExito = true
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
         }
     }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 3 — MIS CITAS
+// TAB 2 — MIS CITAS
 // ══════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun MisCitasTab(
-    uiState: com.example.barberia.viewmodel.ClienteUiState,
+    uiState: ClienteUiState,
     viewModel: ClienteViewModel,
     colores: BarberiaColores
 ) {
+    var filtroEstado by remember { mutableStateOf<String?>(null) }
+    var citaParaCancelar by remember { mutableStateOf<CitaConDetalle?>(null) }
+    var motivoCancelacion by remember { mutableStateOf("") }
+    var mostrarCancelada by remember { mutableStateOf(false) }
     var citaParaResena by remember { mutableStateOf<CitaDTO?>(null) }
     var calificacion   by remember { mutableStateOf(5) }
     var comentario     by remember { mutableStateOf("") }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
-                Text("Mis Citas", color = colores.texto,
-                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                TextButton(onClick = { viewModel.cargarDatosIniciales() }) {
-                    Icon(Icons.Filled.Refresh, null,
-                        tint = ColorRojo, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Actualizar", color = ColorRojo, fontSize = 12.sp)
-                }
-            }
-        }
+    val motivos = listOf(
+        "Cambié de planes",
+        "Encontré otro barbero",
+        "Emergencia personal",
+        "Me equivoqué de fecha",
+        "Otro"
+    )
 
-        if (uiState.isLoading) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().height(200.dp),
-                    contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = ColorRojo,
-                        modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
-                }
-            }
-        } else if (uiState.citas.isEmpty()) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().height(200.dp),
-                    contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Filled.CalendarMonth, null,
-                            tint = colores.textoSub, modifier = Modifier.size(48.dp))
-                        Text("No tienes citas aún",
-                            color = colores.textoSub, fontSize = 15.sp)
+    val citasFiltradas = remember(filtroEstado, uiState.citasConDetalles) {
+        when (filtroEstado) {
+            "Pendientes"  -> uiState.citasConDetalles.filter {
+                it.cita.estado == EstadoCitaEnum.PENDIENTE }
+            "Finalizadas" -> uiState.citasConDetalles.filter {
+                it.cita.estado == EstadoCitaEnum.FINALIZADA }
+            "Canceladas"  -> uiState.citasConDetalles.filter {
+                it.cita.estado == EstadoCitaEnum.CANCELADA }
+            else          -> uiState.citasConDetalles
+        }
+    }
+
+    // Dialog cancelar con motivo
+    citaParaCancelar?.let { detalle ->
+        AlertDialog(
+            onDismissRequest = {
+                citaParaCancelar = null
+                motivoCancelacion = ""
+            },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = {
+                Text("Cancelar cita", color = colores.texto,
+                    fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Selecciona un motivo:",
+                        color = colores.textoSub, fontSize = 13.sp)
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        motivos.forEach { motivo ->
+                            FilterChip(
+                                selected = motivoCancelacion == motivo,
+                                onClick = { motivoCancelacion = motivo },
+                                label = { Text(motivo, fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ColorRojo,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
                     }
                 }
+            },
+            confirmButton = {
+                BarberiaBoton("Confirmar cancelación", onClick = {
+                    if (motivoCancelacion.isNotBlank()) {
+                        viewModel.cancelarCitaConMotivo(
+                            detalle.cita.idCita!!, motivoCancelacion)
+                        citaParaCancelar = null
+                        motivoCancelacion = ""
+                        mostrarCancelada = true
+                    }
+                })
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    citaParaCancelar = null
+                    motivoCancelacion = ""
+                }) {
+                    Text("Volver", color = colores.textoSub)
+                }
             }
-        } else {
-            items(uiState.citas) { cita ->
-                TarjetaCitaCliente(
-                    cita      = cita,
-                    colores   = colores,
-                    onCancelar = { viewModel.cancelarCita(cita.idCita!!) },
-                    onResena   = { citaParaResena = cita }
-                )
+        )
+    }
+
+    // Dialog cita cancelada
+    if (mostrarCancelada) {
+        AlertDialog(
+            onDismissRequest = { mostrarCancelada = false },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Cancel, null,
+                        tint = ColorError, modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Cita cancelada", color = colores.texto,
+                        fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            },
+            text = {
+                Text("Tu cita ha sido cancelada correctamente.",
+                    color = colores.textoSub, fontSize = 14.sp)
+            },
+            confirmButton = {
+                BarberiaBoton("Aceptar", onClick = { mostrarCancelada = false })
             }
-        }
-        item { Spacer(modifier = Modifier.height(20.dp)) }
+        )
     }
 
     // Dialog reseña
@@ -705,220 +1001,82 @@ private fun MisCitasTab(
             }
         )
     }
-}
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TAB 4 — PERFIL
-// ══════════════════════════════════════════════════════════════════════════════
-@Composable
-private fun PerfilTab(
-    uiState: com.example.barberia.viewmodel.ClienteUiState,
-    viewModel: ClienteViewModel,
-    onLogout: () -> Unit,
-    colores: BarberiaColores,
-    sistemaOscuro: Boolean
-) {
-    var modoEdicion  by remember { mutableStateOf(false) }
-    var nombreEdit   by remember { mutableStateOf("") }
-    var telefonoEdit by remember { mutableStateOf("") }
-
-    // Inicializa los campos con los datos actuales del perfil
-    LaunchedEffect(uiState.perfil) {
-        uiState.perfil?.let {
-            nombreEdit   = it.nombre ?: ""
-            telefonoEdit = it.telefono ?: ""
-        }
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    PullToRefreshBox(
+        isRefreshing = uiState.isLoading,
+        onRefresh = { viewModel.cargarDatosIniciales() }
     ) {
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("Mi Perfil", color = colores.texto,
-                fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(colores.fondo)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Mis Citas", color = colores.texto,
+                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
 
-        // Avatar + nombre
-        item {
-            Card(modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = colores.superficie),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = colores.sombra.dp)) {
-                Column {
-                    Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                        Brush.horizontalGradient(
-                            listOf(ColorRojo, ColorRojoClaro))))
-                    Column(modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally) {
-                        // Avatar circular con iniciales
-                        Box(modifier = Modifier.size(80.dp).clip(CircleShape)
-                            .background(ColorRojo.copy(0.15f))
-                            .border(2.dp, ColorRojo, CircleShape),
-                            contentAlignment = Alignment.Center) {
-                            Text(
-                                text = uiState.perfil?.nombre
-                                    ?.split(" ")?.take(2)
-                                    ?.joinToString("") { it.take(1).uppercase() }
-                                    ?: "?",
-                                color = ColorRojo,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 28.sp
+                // Chips de filtro
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val opciones = listOf("Todas" to null,
+                        "Pendientes" to "Pendientes",
+                        "Finalizadas" to "Finalizadas",
+                        "Canceladas" to "Canceladas")
+                    items(opciones) { (label, valor) ->
+                        FilterChip(
+                            selected = filtroEstado == valor,
+                            onClick = { filtroEstado = valor },
+                            label = { Text(label, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = ColorRojo,
+                                selectedLabelColor = Color.White
                             )
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(uiState.perfil?.nombre ?: "Cargando...",
-                            color = colores.texto, fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold)
-                        Text(uiState.perfil?.correo ?: "",
-                            color = colores.textoSub, fontSize = 13.sp)
-
-                        // Badge del rol
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Box(modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(ColorRojo.copy(0.15f))
-                            .padding(horizontal = 12.dp, vertical = 4.dp)) {
-                            Text("CLIENTE", color = ColorRojo,
-                                fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp)
-                        }
+                        )
                     }
                 }
             }
-        }
 
-        // Datos editables
-        item {
-            Card(modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = colores.superficie),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = colores.sombra.dp)) {
-                Column(modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Text("Información personal", color = colores.texto,
-                            fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        TextButton(onClick = { modoEdicion = !modoEdicion }) {
-                            Icon(
-                                imageVector = if (modoEdicion)
-                                    Icons.Filled.Close else Icons.Filled.Edit,
-                                contentDescription = null,
-                                tint = ColorRojo,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (modoEdicion) "Cancelar" else "Editar",
-                                color = ColorRojo, fontSize = 13.sp)
+            if (uiState.isLoading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp),
+                        contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = ColorRojo,
+                            modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
+                    }
+                }
+            } else if (citasFiltradas.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp),
+                        contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Filled.CalendarMonth, null,
+                                tint = colores.textoSub, modifier = Modifier.size(48.dp))
+                            Text("No tienes citas aún",
+                                color = colores.textoSub, fontSize = 15.sp)
                         }
                     }
-
-                    if (modoEdicion) {
-                        // Modo edición — campos editables
-                        BarberiaTextField(nombreEdit, { nombreEdit = it },
-                            "Nombre completo *", Icons.Filled.Person,
-                            ColorRojo, colores)
-                        BarberiaTextField(telefonoEdit, { telefonoEdit = it },
-                            "Teléfono", Icons.Filled.Phone,
-                            ColorRojo, colores,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Phone))
-                        // Correo — solo lectura, no se puede cambiar
-                        CampoSoloLectura("Correo", uiState.perfil?.correo ?: "",
-                            Icons.Filled.Email, colores)
-
-                        BarberiaBoton(
-                            texto      = "Guardar cambios",
-                            icono      = Icons.Filled.Save,
-                            isLoading  = uiState.isLoadingPerfil,
-                            colorFondo = if (nombreEdit.isNotBlank()) ColorRojo
-                            else colores.borde,
-                            onClick    = {
-                                if (nombreEdit.isNotBlank()) {
-                                    viewModel.actualizarPerfil(nombreEdit, telefonoEdit)
-                                    modoEdicion = false
-                                }
+                }
+            } else {
+                items(citasFiltradas, key = { it.cita.idCita ?: 0 }) { detalle ->
+                    TarjetaCitaCliente(
+                        detalle    = detalle,
+                        colores    = colores,
+                        onCancelar = {
+                            if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE) {
+                                citaParaCancelar = detalle
                             }
-                        )
-                    } else {
-                        // Modo lectura — muestra los datos actuales
-                        CampoSoloLectura("Nombre",
-                            uiState.perfil?.nombre ?: "Cargando...",
-                            Icons.Filled.Person, colores)
-                        CampoSoloLectura("Correo",
-                            uiState.perfil?.correo ?: "Cargando...",
-                            Icons.Filled.Email, colores)
-                        CampoSoloLectura("Teléfono",
-                            uiState.perfil?.telefono ?: "No registrado",
-                            Icons.Filled.Phone, colores)
-                    }
+                        },
+                        onResena   = {
+                            if (detalle.cita.estado == EstadoCitaEnum.FINALIZADA) {
+                                citaParaResena = detalle.cita
+                            }
+                        }
+                    )
                 }
             }
-        }
-
-        // Estadísticas del cliente
-        item {
-            Card(modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = colores.superficie),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = colores.sombra.dp)) {
-                Column(modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Mis estadísticas", color = colores.texto,
-                        fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        StatPerfilCliente(
-                            numero   = uiState.citas.size.toString(),
-                            label    = "Citas totales",
-                            color    = ColorRojo,
-                            colores  = colores,
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatPerfilCliente(
-                            numero   = uiState.citas.count {
-                                it.estado == EstadoCitaEnum.FINALIZADA }.toString(),
-                            label    = "Completadas",
-                            color    = ColorVerde,
-                            colores  = colores,
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatPerfilCliente(
-                            numero   = uiState.citas.count {
-                                it.estado == EstadoCitaEnum.PENDIENTE }.toString(),
-                            label    = "Pendientes",
-                            color    = ColorDorado,
-                            colores  = colores,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Botón cerrar sesión
-        item {
-            OutlinedButton(
-                onClick = onLogout,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = ColorError),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp, ColorError)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Logout, null,
-                    modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Cerrar sesión", fontWeight = FontWeight.SemiBold)
-            }
-            Spacer(modifier = Modifier.height(20.dp))
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
     }
 }
@@ -927,25 +1085,35 @@ private fun PerfilTab(
 // COMPONENTES
 // ══════════════════════════════════════════════════════════════════════════════
 
-    @Composable
-    fun BarberiaBoton(
-        texto: String,
-        onClick: () -> Unit,
-        modifier: Modifier = Modifier,
-        isLoading: Boolean = false,
-        habilitado: Boolean = true,
-        icono: ImageVector? = null, // <- Nuevo parámetro opcional
-        colorFondo: Color = ColorRojo // <- Nuevo parámetro con valor por defecto
-    ) {
+@Composable
+fun BarberiaBoton(
+    texto: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
+    habilitado: Boolean = true,
+    icono: ImageVector? = null,
+    colorFondo: Color = ColorRojo
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "scale"
+    )
     Button(
         onClick    = onClick,
-        enabled    = !isLoading,
-        modifier   = Modifier.fillMaxWidth().height(52.dp),
+        enabled    = !isLoading && habilitado,
+        modifier   = Modifier.fillMaxWidth().height(52.dp)
+            .scale(scale)
+            .shadow(4.dp, RoundedCornerShape(14.dp)),
         shape      = RoundedCornerShape(14.dp),
         colors     = ButtonDefaults.buttonColors(
             containerColor         = colorFondo,
             disabledContainerColor = colorFondo.copy(alpha = 0.5f)
-        )
+        ),
+        interactionSource = interactionSource
     ) {
         if (isLoading) {
             CircularProgressIndicator(color = Color.White,
@@ -965,7 +1133,7 @@ fun BarberiaTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    leadingIcon: ImageVector,
     accentColor: Color = ColorRojo,
     colores: BarberiaColores,
     isPassword: Boolean = false,
@@ -1009,11 +1177,10 @@ fun BarberiaTextField(
     )
 }
 
-// Campo de solo lectura para el perfil — no editable
 @Composable
 private fun CampoSoloLectura(
     label: String, valor: String,
-    icono: androidx.compose.ui.graphics.vector.ImageVector,
+    icono: ImageVector,
     colores: BarberiaColores
 ) {
     Row(verticalAlignment = Alignment.CenterVertically,
@@ -1048,64 +1215,13 @@ private fun StatPerfilCliente(
 }
 
 @Composable
-private fun TarjetaBarberoCliente(barbero: BarberoDTO, colores: BarberiaColores) {
-    Card(modifier = Modifier.width(120.dp), shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = colores.superficie),
-        elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
-        Column(modifier = Modifier.padding(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(modifier = Modifier.size(42.dp).clip(CircleShape)
-                .background(ColorRojo.copy(0.15f)),
-                contentAlignment = Alignment.Center) {
-                Text(barbero.nombre.take(2).uppercase(),
-                    color = ColorRojo, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(barbero.nombre, color = colores.texto, fontSize = 12.sp,
-                fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
-                maxLines = 2, overflow = TextOverflow.Ellipsis)
-            barbero.especialidad?.let {
-                Text(it, color = colores.textoSub, fontSize = 10.sp,
-                    textAlign = TextAlign.Center) }
-        }
-    }
-}
-
-@Composable
-private fun TarjetaServicioCliente(servicio: ServicioDTO, colores: BarberiaColores) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = colores.superficie),
-        elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
-        Row(modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)) {
-                Box(modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
-                    .background(ColorRojo.copy(0.1f)),
-                    contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.ContentCut, null,
-                        tint = ColorRojo, modifier = Modifier.size(20.dp))
-                }
-                Column {
-                    Text(servicio.nombre, color = colores.texto,
-                        fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                    Text("${servicio.duracionMinutos} min",
-                        color = colores.textoSub, fontSize = 12.sp)
-                }
-            }
-            Text("\$${servicio.precio.toInt()}", color = ColorRojo,
-                fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        }
-    }
-}
-
-@Composable
 private fun TarjetaCitaCliente(
-    cita: CitaDTO, colores: BarberiaColores,
-    onCancelar: () -> Unit, onResena: () -> Unit
+    detalle: CitaConDetalle,
+    colores: BarberiaColores,
+    onCancelar: () -> Unit,
+    onResena: () -> Unit
 ) {
+    val cita = detalle.cita
     val colorEstado = when (cita.estado) {
         EstadoCitaEnum.PENDIENTE     -> ColorDorado
         EstadoCitaEnum.EN_CURSO      -> ColorAzulClaro
@@ -1114,12 +1230,23 @@ private fun TarjetaCitaCliente(
         EstadoCitaEnum.NO_PRESENTADO -> colores.textoSub
         null                         -> colores.textoSub
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = colores.superficie),
-        elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+    val textoEstado = when (cita.estado) {
+        EstadoCitaEnum.PENDIENTE     -> "Pendiente"
+        EstadoCitaEnum.EN_CURSO      -> "En curso"
+        EstadoCitaEnum.FINALIZADA    -> "Finalizada"
+        EstadoCitaEnum.CANCELADA     -> "Cancelada"
+        EstadoCitaEnum.NO_PRESENTADO -> "No presentó"
+        null -> ""
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(14.dp)),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = colores.superficie)
+    ) {
         Column {
             Row {
-                Box(modifier = Modifier.width(4.dp).height(80.dp)
+                Box(modifier = Modifier.width(4.dp).height(100.dp)
                     .background(colorEstado))
                 Column(modifier = Modifier.weight(1f)
                     .padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -1131,27 +1258,21 @@ private fun TarjetaCitaCliente(
                                 fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             Text("${cita.fecha} · ${cita.horaInicio?.take(5)}",
                                 color = colores.textoSub, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(detalle.barberoNombre, color = colores.texto,
+                                fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Text(detalle.servicioNombre, color = colores.textoSub,
+                                fontSize = 11.sp)
                         }
                         Box(modifier = Modifier.clip(RoundedCornerShape(8.dp))
                             .background(colorEstado.copy(0.15f))
                             .padding(horizontal = 8.dp, vertical = 3.dp)) {
-                            Text(
-                                text = when (cita.estado) {
-                                    EstadoCitaEnum.PENDIENTE     -> "Pendiente"
-                                    EstadoCitaEnum.EN_CURSO      -> "En curso"
-                                    EstadoCitaEnum.FINALIZADA    -> "Finalizada"
-                                    EstadoCitaEnum.CANCELADA     -> "Cancelada"
-                                    EstadoCitaEnum.NO_PRESENTADO -> "No presentó"
-                                    null -> ""
-                                },
-                                color = colorEstado, fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Text(textoEstado, color = colorEstado, fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
-            // Botones según estado
             if (cita.estado == EstadoCitaEnum.PENDIENTE ||
                 cita.estado == EstadoCitaEnum.FINALIZADA) {
                 HorizontalDivider(color = colores.borde)
@@ -1169,7 +1290,7 @@ private fun TarjetaCitaCliente(
                             Icon(Icons.Filled.Star, null,
                                 modifier = Modifier.size(16.dp), tint = ColorDorado)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Reseñar", color = ColorDorado, fontSize = 13.sp)
+                            Text("Dejar reseña", color = ColorDorado, fontSize = 13.sp)
                         }
                     }
                 }
@@ -1195,3 +1316,6 @@ private fun SeccionTituloCliente(
 private fun PasoTituloCliente(texto: String, colores: BarberiaColores) {
     Text(texto, color = colores.textoSub, fontSize = 13.sp, letterSpacing = 0.5.sp)
 }
+
+
+

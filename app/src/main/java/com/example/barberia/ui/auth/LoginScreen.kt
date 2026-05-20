@@ -109,13 +109,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                IconButton(onClick = {
-                    TemaManager.modoOscuro.value = when (TemaManager.modoOscuro.value) {
-                        null  -> !colores.esModoOscuro  // invierte lo que el sistema tiene
-                        true  -> false                  // oscuro → claro
-                        false -> null                   // claro → sistema
-                    }
-                }) {
+                IconButton(onClick = { TemaManager.toggleModo() }) {
                     Icon(
                         imageVector = when (TemaManager.modoOscuro.value) {
                             null  -> Icons.Filled.BrightnessMedium
@@ -190,13 +184,7 @@ fun LoginScreen(
                             .clip(RoundedCornerShape(2.dp)).background(ColorAzul))
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Sistema de gestión de citas",
-                        color = colores.textoSub,
-                        fontSize = 12.sp,
-                        letterSpacing = 1.sp
-                    )
+
                 }
             }
 

@@ -83,7 +83,8 @@ class AuthRepository(
     suspend fun register(
         nombre: String,
         correoOTelefono: String,
-        password: String
+        password: String,
+        telefono: String? = null
     ): Result<RegisterResponse> {
         val maxIntentos = 2
         var ultimoError: Exception? = null
@@ -91,7 +92,7 @@ class AuthRepository(
         for (intento in 1..maxIntentos) {
             try {
                 val response = apiService.register(
-                    RegisterRequest(nombre, correoOTelefono, password)
+                    RegisterRequest(nombre, correoOTelefono, password, telefono)
                 )
                 if (response.isSuccessful) {
                     return Result.Success(response.body()!!)

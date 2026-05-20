@@ -1,5 +1,6 @@
 package com.example.barberia.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -8,7 +9,6 @@ import com.example.barberia.network.ApiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-
 
 data class ClienteUiState(
     val isLoading: Boolean = false,
@@ -24,7 +24,11 @@ data class ClienteUiState(
     val citaDetalle: CitaDTO? = null,
     val notificacionesCita: List<NotificacionDTO> = emptyList(),
     val errorMessage: String? = null,
-    val successMessage: String? = null
+    val successMessage: String? = null,
+    val popularBarberos: List<BarberoDTO> = emptyList(),
+    val popularServicios: List<ServicioDTO> = emptyList(),
+    val notificaciones: List<NotificacionDTO> = emptyList(),
+    val citasConDetalles: List<CitaConDetalle> = emptyList()
 )
 
 class ClienteViewModel(
@@ -45,24 +49,51 @@ class ClienteViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val barberos      = apiService.getBarberosActivos()
+                val barberos       = apiService.getBarberosActivos()
                 val masSolicitados = apiService.getBarberosMasSolicitados()
-                val servicios     = apiService.getServicios()
-                val citas         = apiService.getCitasByUsuario(idUsuario)
-                val perfil        = apiService.getUsuarioById(idUsuario)
-                val promedio      = apiService.getPromedioByUsuarioYBarbero(idUsuario, 0)
+                val servicios      = apiService.getServicios()
+                val citas          = apiService.getCitasByUsuario(idUsuario)
+                val perfil         = apiService.getUsuarioById(idUsuario)
+                val promedio       = apiService.getPromedioByUsuarioYBarbero(idUsuario, 0)
+
+                val barberosList = if (barberos.isSuccessful) barberos.body() ?: emptyList() else emptyList()
+                val masSolicitadosList = if (masSolicitados.isSuccessful) masSolicitados.body() ?: emptyList() else emptyList()
+                val serviciosList = if (servicios.isSuccessful) servicios.body() ?: emptyList() else emptyList()
+                val citasList = if (citas.isSuccessful) citas.body() ?: emptyList() else emptyList()
+
+                val barberosMap = barberosList.associateBy { it.idBarbero }
+                val serviciosMap = serviciosList.associateBy { it.idServicio }
+                val citasConDetalles = citasList.map { cita ->
+                    CitaConDetalle(
+                        cita = cita,
+                        barberoNombre = barberosMap[cita.idBarbero]?.nombre ?: "Barbero #${cita.idBarbero}",
+                        servicioNombre = serviciosMap[cita.idServicio]?.nombre ?: "Servicio #${cita.idServicio}"
+                    )
+                }
+
+                val allNotificaciones = mutableListOf<NotificacionDTO>()
+                for (cita in citasList) {
+                    cita.idCita?.let { idCita ->
+                        try {
+                            val notisResp = apiService.getNotificacionesByCita(idCita)
+                            if (notisResp.isSuccessful) {
+                                allNotificaciones.addAll(notisResp.body() ?: emptyList())
+                            }
+                        } catch (_: Exception) { }
+                    }
+                }
 
                 _uiState.value = _uiState.value.copy(
                     isLoading              = false,
-                    barberos               = if (barberos.isSuccessful)
-                        barberos.body() ?: emptyList() else emptyList(),
-                    barberosMasSolicitados = if (masSolicitados.isSuccessful)
-                        masSolicitados.body() ?: emptyList() else emptyList(),
-                    servicios              = if (servicios.isSuccessful)
-                        servicios.body() ?: emptyList() else emptyList(),
-                    citas                  = if (citas.isSuccessful)
-                        citas.body() ?: emptyList() else emptyList(),
-                    perfil                 = if (perfil.isSuccessful) perfil.body() else null
+                    barberos               = barberosList,
+                    barberosMasSolicitados = masSolicitadosList,
+                    popularBarberos        = masSolicitadosList,
+                    servicios              = serviciosList,
+                    popularServicios       = serviciosList.sortedBy { it.precio },
+                    citas                  = citasList,
+                    citasConDetalles       = citasConDetalles,
+                    perfil                 = if (perfil.isSuccessful) perfil.body() else null,
+                    notificaciones         = allNotificaciones
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -73,8 +104,6 @@ class ClienteViewModel(
         }
     }
 
-    // PUT /api/usuarios/{id} — actualiza nombre y teléfono
-    // El correo no se edita por seguridad
     fun actualizarPerfil(nombre: String, telefono: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoadingPerfil = true)
@@ -186,6 +215,23 @@ class ClienteViewModel(
         }
     }
 
+    fun cancelarCitaConMotivo(idCita: Long, motivo: String) {
+        viewModelScope.launch {
+            try {
+                Log.d("ClienteVM", "Cancelando cita $idCita, motivo: $motivo")
+                val response = apiService.cancelarCita(idCita)
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(successMessage = "Cita cancelada")
+                    cargarDatosIniciales()
+                } else {
+                    _uiState.value = _uiState.value.copy(errorMessage = "Error al cancelar")
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Error al cancelar")
+            }
+        }
+    }
+
     fun enviarResena(idCita: Long, idBarbero: Long, calificacion: Int, comentario: String) {
         if (idUsuario == 0L) return
         viewModelScope.launch {
@@ -249,6 +295,45 @@ class ClienteViewModel(
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
                         promedioCliente = response.body()
+                    )
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun cargarPopularBarberos() {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getBarberosMasSolicitados()
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        popularBarberos = response.body() ?: emptyList()
+                    )
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun cargarPopularServicios() {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getServicios()
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        popularServicios = (response.body() ?: emptyList()).sortedBy { it.precio }
+                    )
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun cargarNotificacionesPorCita(idCita: Long) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getNotificacionesByCita(idCita)
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        notificaciones = response.body() ?: emptyList()
                     )
                 }
             } catch (_: Exception) { }

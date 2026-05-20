@@ -9,29 +9,33 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-// Estado completo de la pantalla del barbero
-// La UI observa este objeto y se redibuja automáticamente cuando cambia
 data class BarberoUiState(
     val isLoading: Boolean = false,
-    val citasHoy: List<CitaDTO> = emptyList(),       // citas del día actual
-    val todasLasCitas: List<CitaDTO> = emptyList(),  // citas de la semana
+    val citasHoy: List<CitaDTO> = emptyList(),
+    val todasLasCitas: List<CitaDTO> = emptyList(),
+    val citasConDetalle: List<CitaConDetalle> = emptyList(),
     val horarios: List<HorarioBarberoDTO> = emptyList(),
     val bloqueos: List<BloqueoHorarioDTO> = emptyList(),
     val resenas: List<ResenaDTO> = emptyList(),
+    val resenasConCliente: List<Pair<ResenaDTO, String>> = emptyList(),
+    val promedio: Double = 0.0,
+    val notificacionesCount: Int = 0,
     val errorMessage: String? = null,
     val successMessage: String? = null
 )
 
 class BarberoViewModel(
     private val apiService: ApiService,
-    private val idBarbero: Long,       // id del barbero en tabla barbero
-    private val idUsuario: Long        // id del usuario vinculado al barbero
+    private val idBarbero: Long,
+    private val idUsuario: Long
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BarberoUiState())
     val uiState: StateFlow<BarberoUiState> = _uiState
 
-    // Fecha de hoy en formato "YYYY-MM-DD" sin java.time (minSdk 24)
+    var restBlock: String? = null
+    var diaDescanso: String? = null
+
     private val fechaHoy: String
         get() = java.util.Calendar.getInstance().let {
             "%d-%02d-%02d".format(
@@ -45,7 +49,6 @@ class BarberoViewModel(
         cargarDatosIniciales()
     }
 
-    // Carga citas de hoy, reseñas y bloqueos del barbero
     fun cargarDatosIniciales() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
@@ -55,29 +58,89 @@ class BarberoViewModel(
                 val bloqueos  = apiService.getBloqueosByBarbero(idBarbero)
                 val horarios  = apiService.getHorariosByBarbero(idBarbero)
 
+                val citas = if (citasHoy.isSuccessful) citasHoy.body() ?: emptyList() else emptyList()
+                val resenasList = if (resenas.isSuccessful) resenas.body() ?: emptyList() else emptyList()
+                val bloqueosList = if (bloqueos.isSuccessful) bloqueos.body() ?: emptyList() else emptyList()
+                val horariosList = if (horarios.isSuccessful) horarios.body() ?: emptyList() else emptyList()
+
+                val prom = if (resenasList.isNotEmpty())
+                    resenasList.mapNotNull { it.calificacion }.average() else 0.0
+
+                val usuariosIdsResenas = resenasList.map { it.idUsuario }.distinct()
+                val usuariosMap = mutableMapOf<Long, String>()
+                for (uid in usuariosIdsResenas) {
+                    val uResp = apiService.getUsuarioById(uid)
+                    if (uResp.isSuccessful) {
+                        uResp.body()?.let { usuariosMap[uid] = it.nombre }
+                    }
+                }
+                val resConCliente = resenasList.map { r ->
+                    r to (usuariosMap[r.idUsuario] ?: "Cliente #${r.idUsuario}")
+                }
+
                 _uiState.value = _uiState.value.copy(
-                    isLoading     = false,
-                    citasHoy      = if (citasHoy.isSuccessful)
-                        citasHoy.body() ?: emptyList() else emptyList(),
-                    resenas       = if (resenas.isSuccessful)
-                        resenas.body() ?: emptyList() else emptyList(),
-                    bloqueos      = if (bloqueos.isSuccessful)
-                        bloqueos.body() ?: emptyList() else emptyList(),
-                    horarios      = if (horarios.isSuccessful)
-                        horarios.body() ?: emptyList() else emptyList()
+                    isLoading = false,
+                    citasHoy = citas,
+                    bloqueos = bloqueosList,
+                    horarios = horariosList,
+                    resenas = resenasList,
+                    resenasConCliente = resConCliente,
+                    promedio = prom,
+                    notificacionesCount = citas.size
                 )
+
+                cargarCitasConDetalle()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    isLoading    = false,
+                    isLoading = false,
                     errorMessage = "Sin conexión. Verifica tu internet."
                 )
             }
         }
     }
 
-    // PATCH /api/citas/{id}/iniciar
-    // El barbero confirma que la cita está comenzando
-    // Cambia el estado de PENDIENTE → EN_CURSO
+    fun cargarCitasConDetalle() {
+        viewModelScope.launch {
+            try {
+                val citas = _uiState.value.citasHoy
+                if (citas.isEmpty()) return@launch
+
+                val barberoResp = apiService.getBarberoById(idBarbero)
+                val barberoNombre = if (barberoResp.isSuccessful)
+                    barberoResp.body()?.nombre ?: "Barbero" else "Barbero"
+
+                val serviciosIds = citas.map { it.idServicio }.distinct()
+                val serviciosMap = mutableMapOf<Long, String>()
+                for (sid in serviciosIds) {
+                    val sResp = apiService.getServicioById(sid)
+                    if (sResp.isSuccessful) {
+                        sResp.body()?.let { serviciosMap[sid] = it.nombre }
+                    }
+                }
+
+                val usuariosIds = citas.map { it.idUsuario }.distinct()
+                val usuariosMap = mutableMapOf<Long, String>()
+                for (uid in usuariosIds) {
+                    val uResp = apiService.getUsuarioById(uid)
+                    if (uResp.isSuccessful) {
+                        uResp.body()?.let { usuariosMap[uid] = it.nombre }
+                    }
+                }
+
+                val detalle = citas.map { cita ->
+                    CitaConDetalle(
+                        cita = cita,
+                        clienteNombre = usuariosMap[cita.idUsuario] ?: "Cliente #${cita.idUsuario}",
+                        barberoNombre = barberoNombre,
+                        servicioNombre = serviciosMap[cita.idServicio] ?: "Servicio #${cita.idServicio}"
+                    )
+                }
+
+                _uiState.value = _uiState.value.copy(citasConDetalle = detalle)
+            } catch (_: Exception) { }
+        }
+    }
+
     fun iniciarCita(idCita: Long) {
         viewModelScope.launch {
             try {
@@ -98,9 +161,6 @@ class BarberoViewModel(
         }
     }
 
-    // PATCH /api/citas/{id}/finalizar
-    // El barbero confirma que terminó el servicio
-    // Cambia EN_CURSO → FINALIZADA y actualiza el promedio del cliente
     fun finalizarCita(idCita: Long) {
         viewModelScope.launch {
             try {
@@ -121,9 +181,6 @@ class BarberoViewModel(
         }
     }
 
-    // PATCH /api/citas/{id}/no-presento
-    // El barbero marca que el cliente no se presentó
-    // Cambia PENDIENTE → NO_PRESENTADO
     fun marcarNoPresento(idCita: Long) {
         viewModelScope.launch {
             try {
@@ -144,9 +201,6 @@ class BarberoViewModel(
         }
     }
 
-    // POST /api/bloqueos
-    // El barbero bloquea un rango de tiempo (vacaciones, descanso, etc.)
-    // fechaInicio y fechaFin en formato "YYYY-MM-DDTHH:mm:ss"
     fun crearBloqueo(fechaInicio: String, fechaFin: String, motivo: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
@@ -181,8 +235,6 @@ class BarberoViewModel(
         }
     }
 
-    // DELETE /api/bloqueos/{id}
-    // Elimina un bloqueo existente
     fun eliminarBloqueo(idBloqueo: Long) {
         viewModelScope.launch {
             try {
@@ -224,6 +276,27 @@ class BarberoViewModel(
             errorMessage   = null,
             successMessage = null
         )
+    }
+
+    fun guardarBloqueoDescanso(dia: String, bloque: String) {
+        viewModelScope.launch {
+            val days = listOf("DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO")
+            val targetIndex = days.indexOf(dia.uppercase())
+            if (targetIndex < 0) return@launch
+            val cal = java.util.Calendar.getInstance()
+            val todayIndex = cal.get(java.util.Calendar.DAY_OF_WEEK) - 1
+            var diff = targetIndex - todayIndex
+            if (diff <= 0) diff += 7
+            cal.add(java.util.Calendar.DAY_OF_MONTH, diff)
+            val fecha = "%d-%02d-%02d".format(
+                cal.get(java.util.Calendar.YEAR),
+                cal.get(java.util.Calendar.MONTH) + 1,
+                cal.get(java.util.Calendar.DAY_OF_MONTH)
+            )
+            val parts = bloque.split("-")
+            if (parts.size != 2) return@launch
+            crearBloqueo("${fecha}T${parts[0]}:00", "${fecha}T${parts[1]}:00", "Descanso")
+        }
     }
 
     companion object {

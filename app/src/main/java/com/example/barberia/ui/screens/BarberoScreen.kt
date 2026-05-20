@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,15 +36,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.barberia.model.*
 import com.example.barberia.network.ApiService
-import com.example.barberia.ui.auth.BarberiaBoton
-import com.example.barberia.ui.auth.BarberiaTextField
 import com.example.barberia.ui.theme.*
 import com.example.barberia.viewmodel.BarberoViewModel
+
 import kotlinx.coroutines.launch
+import java.text.Normalizer
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -51,18 +54,11 @@ fun BarberoScreen(
     idBarbero: Long,
     idUsuario: Long,
     nombre: String,
-    onLogout: () -> Unit
-) {
-    val colores = LocalBarberiaColores.current
-    val sistemaOscuro = isSystemInDarkTheme()
-
-    val viewModel: BarberoViewModel = viewModel(
-        key     = "barbero_${idBarbero}_$idUsuario",
-        factory = BarberoViewModel.factory(apiService, idBarbero, idUsuario)
-    )
+    onLogout: () -> Unit,
+    onNavigateToNotificaciones: () -> Unit = {}
+)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Swipe + tap sincronizados — igual que ClienteScreen
     val pagerState    = rememberPagerState(pageCount = { 4 })
     val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
@@ -99,22 +95,119 @@ fun BarberoScreen(
             }
         }
     ) { padding ->
-        HorizontalPager(
-            state             = pagerState,
-            modifier          = Modifier.padding(padding).fillMaxSize(),
-            userScrollEnabled = true
-        ) { pagina ->
-            when (pagina) {
-                0 -> HoyTab(nombre, uiState, viewModel, onLogout, colores, sistemaOscuro)
-                1 -> AgendaTab(uiState, viewModel, colores)
-                2 -> ResenasBarberoTab(uiState, colores)
-                3 -> HorariosBarberoTab(uiState, colores)
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            BarberoHeader(nombre, uiState.notificacionesCount, colores, onLogout, onNavigateToNotificaciones)
+
+            HorizontalPager(
+                state             = pagerState,
+                modifier          = Modifier.weight(1f),
+                userScrollEnabled = true
+            ) { pagina ->
+                when (pagina) {
+                    0 -> HoyTab(nombre, uiState, viewModel, colores)
+                    1 -> AgendaTab(uiState, viewModel, colores)
+                    2 -> ResenasBarberoTab(uiState, colores)
+                    3 -> HorariosBarberoTab(uiState, colores)
+                }
             }
         }
     }
 }
 
-// ── Bottom Navigation Bar — acento azul ───────────────────────────────────────
+// ── Header compartido ───────────────────────────────────────────────────────
+@Composable
+private fun BarberoHeader(
+    nombre: String,
+    notificacionesCount: Int,
+    colores: BarberiaColores,
+    onLogout: () -> Unit,
+    onNavigateToNotificaciones: () -> Unit = {}
+)
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .zIndex(1f)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
+                    )
+                )
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier.size(44.dp).clip(CircleShape).background(ColorAzul),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = getInitials(nombre),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+                Column {
+                    Text(nombre, color = colores.texto, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("Barbero", color = ColorAzul, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Box {
+                    BotonIconoBarbero(Icons.Filled.Notifications, colores.textoSub, onClick = onNavigateToNotificaciones)
+                    if (notificacionesCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 4.dp, y = (-4).dp)
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(ColorError),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (notificacionesCount > 99) "99+" else notificacionesCount.toString(),
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                IconButton(onClick = { TemaManager.toggleModo() }) {
+                    Icon(
+                        imageVector = when (TemaManager.modoOscuro.value) {
+                            null  -> Icons.Filled.BrightnessMedium
+                            true  -> Icons.Filled.DarkMode
+                            false -> Icons.Filled.LightMode
+                        },
+                        contentDescription = "Modo",
+                        tint = colores.textoSub,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                BotonIconoBarbero(Icons.AutoMirrored.Filled.Logout, colores.textoSub, onLogout)
+            }
+        }
+    }
+}
+
+// ── Bottom Navigation Bar ────────────────────────────────────────────────────
 @Composable
 private fun BarberoBottomBar(
     paginaActual: Int,
@@ -158,192 +251,169 @@ private fun BarberoBottomBar(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 1 — HOY
-// Muestra: agenda del día con acciones por cita (iniciar/finalizar/no presentó)
+// TAB 0 — HOY
 // ══════════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HoyTab(
     nombre: String,
     uiState: com.example.barberia.viewmodel.BarberoUiState,
     viewModel: BarberoViewModel,
-    onLogout: () -> Unit,
-    colores: BarberiaColores,
-    sistemaOscuro: Boolean
+    colores: BarberiaColores
 ) {
-    // Dialog de confirmación para acciones críticas
+    var filtroEstado by remember { mutableStateOf<EstadoCitaEnum?>(null) }
     var citaAccion     by remember { mutableStateOf<CitaDTO?>(null) }
     var tipoAccion     by remember { mutableStateOf("") }
+    var citaDetalle    by remember { mutableStateOf<CitaConDetalle?>(null) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
+    val citasFiltradas = if (filtroEstado != null) {
+        uiState.citasHoy.filter { it.estado == filtroEstado }
+    } else {
+        uiState.citasHoy
+    }
+
+    PullToRefreshBox(
+        isRefreshing = uiState.isLoading,
+        onRefresh = { viewModel.cargarDatosIniciales() },
+        modifier = Modifier.fillMaxSize()
     ) {
-        // ── Header azul ───────────────────────────────────────────────────
-        item {
-            Box(modifier = Modifier.fillMaxWidth().background(
-                Brush.verticalGradient(
-                    if (colores.esModoOscuro)
-                        listOf(Color(0xFF020A1A), colores.fondo)
-                    else
-                        listOf(Color(0xFFF0F5FF), colores.fondo)
-                )
-            )) {
-                // Franja polo — azul para barbero
-                Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                    Brush.horizontalGradient(
-                        listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
-                    )))
-
-                Column(modifier = Modifier.padding(
-                    start = 20.dp, end = 20.dp, top = 52.dp, bottom = 20.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Box(modifier = Modifier.size(8.dp).clip(CircleShape)
-                                    .background(ColorAzul))
-                                Text("BARBERO", color = ColorAzul, fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("$nombre, hoy tienes", color = colores.texto,
-                                fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            // Cuenta solo citas activas (no canceladas ni no presentadas)
-                            val citasActivas = uiState.citasHoy.count {
-                                it.estado != EstadoCitaEnum.CANCELADA &&
-                                        it.estado != EstadoCitaEnum.NO_PRESENTADO
-                            }
-                            Text(
-                                text = "$citasActivas cita${if (citasActivas != 1) "s" else ""} programadas",
-                                color = ColorAzul,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            // Avatar inicial
-                            Box(modifier = Modifier.size(44.dp).clip(CircleShape)
-                                .background(ColorAzul),
-                                contentAlignment = Alignment.Center) {
-                                Text(nombre.take(2).uppercase(), color = Color.White,
-                                    fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-                            // Toggle modo claro/oscuro
-                            IconButton(onClick = { TemaManager.toggleModo(sistemaOscuro) }) {
-                                Icon(
-                                    imageVector = when (TemaManager.modoOscuro.value) {
-                                        null  -> Icons.Filled.BrightnessMedium
-                                        true  -> Icons.Filled.DarkMode
-                                        false -> Icons.Filled.LightMode
-                                    },
-                                    contentDescription = "Modo",
-                                    tint = colores.textoSub,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            BotonIconoBarbero(Icons.AutoMirrored.Filled.Logout,
-                                colores.textoSub, onLogout)
-                        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(colores.fondo)
+        ) {
+            item {
+                Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(ColorAzul))
+                        Text("BARBERO", color = ColorAzul, fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                     }
-                }
-            }
-        }
-
-        item { Spacer(modifier = Modifier.height(20.dp)) }
-
-        if (uiState.isLoading) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().height(200.dp),
-                    contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = ColorAzul,
-                        strokeWidth = 2.5.dp, modifier = Modifier.size(36.dp))
-                }
-            }
-        } else {
-
-            // Stats del día
-            item {
-                Row(modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatBarbero(
-                        numero = uiState.citasHoy.count {
-                            it.estado == EstadoCitaEnum.PENDIENTE }.toString(),
-                        label = "Pendientes",
-                        color = ColorDorado,
-                        colores = colores,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatBarbero(
-                        numero = uiState.citasHoy.count {
-                            it.estado == EstadoCitaEnum.EN_CURSO }.toString(),
-                        label = "En curso",
-                        color = ColorAzul,
-                        colores = colores,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatBarbero(
-                        numero = uiState.citasHoy.count {
-                            it.estado == EstadoCitaEnum.FINALIZADA }.toString(),
-                        label = "Finalizadas",
-                        color = ColorVerde,
-                        colores = colores,
-                        modifier = Modifier.weight(1f)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("$nombre, hoy tienes", color = colores.texto,
+                        fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    val citasActivas = uiState.citasHoy.count {
+                        it.estado != EstadoCitaEnum.CANCELADA &&
+                                it.estado != EstadoCitaEnum.NO_PRESENTADO
+                    }
+                    Text(
+                        text = "$citasActivas cita${if (citasActivas != 1) "s" else ""} programadas",
+                        color = ColorAzul, fontSize = 15.sp, fontWeight = FontWeight.SemiBold
                     )
                 }
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
-            // Agenda del día
-            item {
-                Row(modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    SeccionTituloBarbero("Agenda de hoy", colores)
-                    TextButton(onClick = { viewModel.cargarDatosIniciales() }) {
-                        Icon(Icons.Filled.Refresh, null,
-                            tint = ColorAzul, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Actualizar", color = ColorAzul, fontSize = 12.sp)
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
-            if (uiState.citasHoy.isEmpty()) {
+            if (uiState.isLoading && uiState.citasHoy.isEmpty()) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().height(160.dp),
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp),
                         contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Filled.EventAvailable, null,
-                                tint = colores.textoSub, modifier = Modifier.size(44.dp))
-                            Text("Sin citas para hoy",
-                                color = colores.textoSub, fontSize = 15.sp)
-                        }
+                        CircularProgressIndicator(color = ColorAzul,
+                            strokeWidth = 2.5.dp, modifier = Modifier.size(36.dp))
                     }
                 }
             } else {
-                // Lista de citas del día con sus botones de acción
-                items(uiState.citasHoy) { cita ->
-                    Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
-                        TarjetaCitaBarbero(
-                            cita    = cita,
+                item {
+                    Row(modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        StatBarbero(
+                            numero = uiState.citasHoy.count {
+                                it.estado == EstadoCitaEnum.PENDIENTE }.toString(),
+                            label = "Pendientes",
+                            color = ColorDorado,
                             colores = colores,
-                            onIniciar    = { citaAccion = cita; tipoAccion = "iniciar" },
-                            onFinalizar  = { citaAccion = cita; tipoAccion = "finalizar" },
-                            onNoPresento = { citaAccion = cita; tipoAccion = "nopresento" }
+                            activo = filtroEstado == EstadoCitaEnum.PENDIENTE,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                filtroEstado = if (filtroEstado == EstadoCitaEnum.PENDIENTE) null
+                                else EstadoCitaEnum.PENDIENTE
+                            }
                         )
+                        StatBarbero(
+                            numero = uiState.citasHoy.count {
+                                it.estado == EstadoCitaEnum.EN_CURSO }.toString(),
+                            label = "En curso",
+                            color = ColorAzul,
+                            colores = colores,
+                            activo = filtroEstado == EstadoCitaEnum.EN_CURSO,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                filtroEstado = if (filtroEstado == EstadoCitaEnum.EN_CURSO) null
+                                else EstadoCitaEnum.EN_CURSO
+                            }
+                        )
+                        StatBarbero(
+                            numero = uiState.citasHoy.count {
+                                it.estado == EstadoCitaEnum.FINALIZADA }.toString(),
+                            label = "Finalizadas",
+                            color = ColorVerde,
+                            colores = colores,
+                            activo = filtroEstado == EstadoCitaEnum.FINALIZADA,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                filtroEstado = if (filtroEstado == EstadoCitaEnum.FINALIZADA) null
+                                else EstadoCitaEnum.FINALIZADA
+                            }
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+
+                item {
+                    Row(modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        SeccionTituloBarbero("Agenda de hoy", colores)
+                        TextButton(onClick = { viewModel.cargarDatosIniciales() }) {
+                            Icon(Icons.Filled.Refresh, null,
+                                tint = ColorAzul, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Actualizar", color = ColorAzul, fontSize = 12.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
+                if (citasFiltradas.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().height(160.dp),
+                            contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Filled.EventAvailable, null,
+                                    tint = colores.textoSub, modifier = Modifier.size(44.dp))
+                                Text(
+                                    if (filtroEstado != null) "Sin citas en este filtro"
+                                    else "Sin citas para hoy",
+                                    color = colores.textoSub, fontSize = 15.sp)
+                            }
+                        }
+                    }
+                } else {
+                    items(citasFiltradas) { cita ->
+                        Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                            TarjetaCitaBarbero(
+                                cita    = cita,
+                                colores = colores,
+                                onClick = {
+                                    citaDetalle = uiState.citasConDetalle.find {
+                                        it.cita.idCita == cita.idCita
+                                    } ?: CitaConDetalle(cita, "Cliente #${cita.idUsuario}",
+                                        "Barbero", "Servicio #${cita.idServicio}")
+                                },
+                                onIniciar    = { citaAccion = cita; tipoAccion = "iniciar" },
+                                onFinalizar  = { citaAccion = cita; tipoAccion = "finalizar" },
+                                onNoPresento = { citaAccion = cita; tipoAccion = "nopresento" }
+                            )
+                        }
                     }
                 }
             }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
-        item { Spacer(modifier = Modifier.height(20.dp)) }
     }
 
-    // Dialog confirmación de acción
     citaAccion?.let { cita ->
         val (titulo, mensaje, colorBtn) = when (tipoAccion) {
             "iniciar"    -> Triple("Iniciar cita",
@@ -361,10 +431,10 @@ private fun HoyTab(
             title = { Text(titulo, color = colores.texto, fontWeight = FontWeight.Bold) },
             text  = { Text(mensaje, color = colores.textoSub, fontSize = 14.sp) },
             confirmButton = {
-                BarberiaBoton(
-                    texto      = "Confirmar",
-                    colorFondo = colorBtn,
-                    onClick    = {
+                BotonBarberoAnimado(
+                    text = "Confirmar",
+                    color = colorBtn,
+                    onClick = {
                         when (tipoAccion) {
                             "iniciar"    -> viewModel.iniciarCita(cita.idCita!!)
                             "finalizar"  -> viewModel.finalizarCita(cita.idCita!!)
@@ -381,10 +451,55 @@ private fun HoyTab(
             }
         )
     }
+
+    citaDetalle?.let { detalle ->
+        AlertDialog(
+            onDismissRequest = { citaDetalle = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = {
+                Text("Detalle de cita", color = colores.texto, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilaDetalle("Fecha", detalle.cita.fecha ?: "--", colores)
+                    FilaDetalle("Hora", "${detalle.cita.horaInicio?.take(5) ?: "--:--"} - ${detalle.cita.horaFin?.take(5) ?: "--:--"}", colores)
+                    FilaDetalle("Cliente", detalle.clienteNombre, colores)
+                    FilaDetalle("Barbero", detalle.barberoNombre, colores)
+                    FilaDetalle("Servicio", detalle.servicioNombre, colores)
+                    val estadoTxt = when (detalle.cita.estado) {
+                        EstadoCitaEnum.PENDIENTE -> "Pendiente"
+                        EstadoCitaEnum.EN_CURSO -> "En curso"
+                        EstadoCitaEnum.FINALIZADA -> "Finalizada"
+                        EstadoCitaEnum.CANCELADA -> "Cancelada"
+                        EstadoCitaEnum.NO_PRESENTADO -> "No se presentó"
+                        null -> "--"
+                    }
+                    FilaDetalle("Estado", estadoTxt, colores)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { citaDetalle = null }) {
+                    Text("Cerrar", color = ColorAzul)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun FilaDetalle(label: String, valor: String, colores: BarberiaColores) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = colores.textoSub, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Text(valor, color = colores.texto, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 2 — AGENDA (Bloquear horario)
+// TAB 1 — AGENDA (selector de día y bloque de descanso)
 // ══════════════════════════════════════════════════════════════════════════════
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -393,155 +508,158 @@ private fun AgendaTab(
     viewModel: BarberoViewModel,
     colores: BarberiaColores
 ) {
-    var fechaInicio    by remember { mutableStateOf("") }
-    var fechaFin       by remember { mutableStateOf("") }
-    var horaInicio     by remember { mutableStateOf("") }
-    var horaFin        by remember { mutableStateOf("") }
-    var motivo         by remember { mutableStateOf("") }
+    val diasSemana = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+    var selectedDay by remember { mutableStateOf<String?>(null) }
+    var selectedBlock by remember { mutableStateOf<String?>(null) }
 
-    // DatePicker para fecha inicio
-    var mostrarCalInicio by remember { mutableStateOf(false) }
-    var mostrarCalFin    by remember { mutableStateOf(false) }
-    val datePickerInicio = rememberDatePickerState()
-    val datePickerFin    = rememberDatePickerState()
-
-    // Convierte millis a "YYYY-MM-DD"
-    fun millisAFecha(millis: Long): String {
-        val cal = java.util.Calendar.getInstance().apply {
-            timeInMillis = millis
-            add(java.util.Calendar.DAY_OF_MONTH, 1)
+    val bloques30 = remember {
+        val blocks = mutableListOf<String>()
+        for (h in 9 until 19) {
+            blocks.add("%02d:00-%02d:30".format(h, h))
+            blocks.add("%02d:30-%02d:00".format(h, h + 1))
         }
-        return "%d-%02d-%02d".format(
-            cal.get(java.util.Calendar.YEAR),
-            cal.get(java.util.Calendar.MONTH) + 1,
-            cal.get(java.util.Calendar.DAY_OF_MONTH)
-        )
+        blocks
     }
 
-    // DatePickerDialog inicio
-    if (mostrarCalInicio) {
-        DatePickerDialog(
-            onDismissRequest = { mostrarCalInicio = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerInicio.selectedDateMillis?.let {
-                        fechaInicio = millisAFecha(it) }
-                    mostrarCalInicio = false
-                }) { Text("Confirmar", color = ColorAzul, fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarCalInicio = false }) {
-                    Text("Cancelar", color = colores.textoSub) }
-            },
-            colors = datePickerColores(colores)
-        ) { DatePicker(state = datePickerInicio, colors = datePickerColores(colores)) }
-    }
-
-    // DatePickerDialog fin
-    if (mostrarCalFin) {
-        DatePickerDialog(
-            onDismissRequest = { mostrarCalFin = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerFin.selectedDateMillis?.let {
-                        fechaFin = millisAFecha(it) }
-                    mostrarCalFin = false
-                }) { Text("Confirmar", color = ColorAzul, fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarCalFin = false }) {
-                    Text("Cancelar", color = colores.textoSub) }
-            },
-            colors = datePickerColores(colores)
-        ) { DatePicker(state = datePickerFin, colors = datePickerColores(colores)) }
+    fun bloqueOcupado(bloque: String): Boolean {
+        val parts = bloque.split("-")
+        if (parts.size != 2) return false
+        return uiState.bloqueos.any { b ->
+            val ini = b.fechaInicio?.substringAfter("T")?.take(5) ?: ""
+            val fin = b.fechaFin?.substringAfter("T")?.take(5) ?: ""
+            ini <= parts[1] && fin >= parts[0]
+        } || uiState.citasHoy.any { c ->
+            val ci = c.horaInicio?.take(5) ?: ""
+            val cf = c.horaFin?.take(5) ?: ""
+            ci < parts[1] && cf > parts[0]
+        }
     }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(colores.fondo)
             .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Spacer(modifier = Modifier.height(20.dp))
-            Text("Bloquear horario", color = colores.texto,
+            Text("Bloquear descanso", color = colores.texto,
                 fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("Bloquea tiempo para descanso, vacaciones o imprevistos",
+            Text("Selecciona un día y un bloque de 30 min para descanso",
                 color = colores.textoSub, fontSize = 13.sp)
         }
 
-        // Formulario de bloqueo
         item {
-            Card(modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = colores.superficie),
-                elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
-                Column {
-                    Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                        Brush.horizontalGradient(listOf(ColorAzul, ColorAzulClaro))))
-                    Column(modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)) {
-
-                        Text("Nuevo bloqueo", color = colores.texto,
-                            fontWeight = FontWeight.Bold, fontSize = 15.sp)
-
-                        // Fecha inicio — abre calendario
-                        CampoFechaBarbero("Fecha inicio",
-                            fechaInicio, colores) { mostrarCalInicio = true }
-
-                        // Hora inicio
-                        BarberiaTextField(value = horaInicio,
-                            onValueChange = { horaInicio = it },
-                            label = "Hora inicio — ej: 09:00",
-                            leadingIcon = Icons.Filled.Schedule,
-                            accentColor = ColorAzul, colores = colores)
-
-                        // Fecha fin — abre calendario
-                        CampoFechaBarbero("Fecha fin",
-                            fechaFin, colores) { mostrarCalFin = true }
-
-                        // Hora fin
-                        BarberiaTextField(value = horaFin,
-                            onValueChange = { horaFin = it },
-                            label = "Hora fin — ej: 18:00",
-                            leadingIcon = Icons.Filled.Schedule,
-                            accentColor = ColorAzul, colores = colores)
-
-                        // Motivo
-                        BarberiaTextField(value = motivo,
-                            onValueChange = { motivo = it },
-                            label = "Motivo (opcional)",
-                            leadingIcon = Icons.Filled.Edit,
-                            accentColor = ColorAzul, colores = colores)
-
-                        val formListo = fechaInicio.length == 10 &&
-                                fechaFin.length == 10 &&
-                                horaInicio.length >= 5 &&
-                                horaFin.length >= 5
-
-                        BarberiaBoton(
-                            texto      = "Bloquear horario",
-                            icono      = Icons.Filled.Lock,
-                            isLoading  = uiState.isLoading,
-                            colorFondo = if (formListo) ColorAzul else colores.borde,
-                            onClick    = {
-                                if (formListo) {
-                                    viewModel.crearBloqueo(
-                                        "${fechaInicio}T${horaInicio}:00",
-                                        "${fechaFin}T${horaFin}:00",
-                                        motivo
-                                    )
-                                    fechaInicio = ""; fechaFin = ""
-                                    horaInicio = ""; horaFin = ""; motivo = ""
-                                }
-                            }
+            Text("Día de la semana", color = colores.texto,
+                fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                diasSemana.forEach { dia ->
+                    val seleccionado = selectedDay == dia
+                    FilterChip(
+                        selected = seleccionado,
+                        onClick = {
+                            selectedDay = if (seleccionado) null else dia
+                            selectedBlock = null
+                        },
+                        label = { Text(dia, fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = ColorAzul,
+                            selectedLabelColor = Color.White
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            borderColor = if (seleccionado) ColorAzul else colores.borde,
+                            selectedBorderColor = ColorAzul,
+                            enabled = true,
+                            selected = seleccionado
                         )
-                    }
+                    )
                 }
             }
         }
 
-        // Lista de bloqueos activos
+        if (selectedDay != null) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Bloques de 30 min", color = colores.texto,
+                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            item {
+                val chunks = bloques30.chunked(4)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    chunks.forEach { row ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            row.forEach { bloque ->
+                                val ocupado = bloqueOcupado(bloque)
+                                val seleccionado = selectedBlock == bloque
+                                FilterChip(
+                                    selected = seleccionado,
+                                    onClick = {
+                                        if (!ocupado) {
+                                            selectedBlock = if (seleccionado) null else bloque
+                                        }
+                                    },
+                                    label = {
+                                        Text(
+                                            if (ocupado) "$bloque Ocupado" else bloque,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    enabled = !ocupado,
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = ColorAzul,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = if (ocupado)
+                                            colores.superficie.copy(alpha = 0.5f)
+                                        else colores.superficie,
+                                        labelColor = if (ocupado) colores.textoSub else colores.texto
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        borderColor = if (ocupado) ColorError.copy(alpha = 0.3f)
+                                        else if (seleccionado) ColorAzul else colores.borde,
+                                        selectedBorderColor = ColorAzul,
+                                        enabled = !ocupado,
+                                        selected = seleccionado
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                BotonBarberoAnimado(
+                    text = "Guardar bloque de descanso",
+                    icon = Icons.Filled.Lock,
+                    color = if (selectedBlock != null) ColorAzul else colores.borde,
+                    enabled = selectedBlock != null,
+                    colores = colores,
+                    onClick = {
+                        selectedDay?.let { d ->
+                            selectedBlock?.let { b ->
+                                viewModel.guardarBloqueoDescanso(d, b)
+                                selectedBlock = null
+                                selectedDay = null
+                            }
+                        }
+                    }
+                )
+            }
+        }
+
         item {
+            Spacer(modifier = Modifier.height(12.dp))
             SeccionTituloBarbero("Bloqueos activos", colores)
             Spacer(modifier = Modifier.height(10.dp))
         }
@@ -563,16 +681,16 @@ private fun AgendaTab(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 3 — RESEÑAS
+// TAB 2 — RESEÑAS agrupadas por cliente
 // ══════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun ResenasBarberoTab(
     uiState: com.example.barberia.viewmodel.BarberoUiState,
     colores: BarberiaColores
 ) {
-    // Calificación promedio calculada en el cliente
-    val promedio = if (uiState.resenas.isNotEmpty())
-        uiState.resenas.mapNotNull { it.calificacion }.average() else 0.0
+    val grouped = remember(uiState.resenasConCliente) {
+        uiState.resenasConCliente.groupBy({ it.second }, { it.first })
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(colores.fondo)
@@ -585,7 +703,6 @@ private fun ResenasBarberoTab(
                 fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
 
-        // Resumen promedio
         item {
             Card(modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -602,7 +719,7 @@ private fun ResenasBarberoTab(
                                 fontSize = 12.sp, letterSpacing = 1.sp)
                             Row(verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("%.1f".format(promedio), color = ColorDorado,
+                                Text("%.1f".format(uiState.promedio), color = ColorDorado,
                                     fontSize = 36.sp, fontWeight = FontWeight.Bold)
                                 Icon(Icons.Filled.Star, null,
                                     tint = ColorDorado, modifier = Modifier.size(28.dp))
@@ -610,15 +727,13 @@ private fun ResenasBarberoTab(
                             Text("${uiState.resenas.size} reseña${if (uiState.resenas.size != 1) "s" else ""}",
                                 color = colores.textoSub, fontSize = 12.sp)
                         }
-                        // Mini distribución de estrellas
                         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             (5 downTo 1).forEach { estrellas ->
                                 val cant = uiState.resenas.count {
                                     it.calificacion == estrellas }
                                 Row(verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text("$estrellas", color = colores.textoSub,
-                                        fontSize = 11.sp)
+                                    Text("$estrellas", color = colores.textoSub, fontSize = 11.sp)
                                     Icon(Icons.Filled.Star, null,
                                         tint = ColorDorado, modifier = Modifier.size(12.dp))
                                     Text("$cant", color = colores.texto, fontSize = 11.sp)
@@ -630,7 +745,7 @@ private fun ResenasBarberoTab(
             }
         }
 
-        if (uiState.resenas.isEmpty()) {
+        if (grouped.isEmpty()) {
             item {
                 Box(modifier = Modifier.fillMaxWidth().height(180.dp),
                     contentAlignment = Alignment.Center) {
@@ -644,8 +759,16 @@ private fun ResenasBarberoTab(
                 }
             }
         } else {
-            items(uiState.resenas) { resena ->
-                TarjetaResenaBarbero(resena, colores)
+            grouped.forEach { (cliente, resenas) ->
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(cliente, color = ColorAzul, fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+                items(resenas) { resena ->
+                    TarjetaResenaBarbero(resena, colores, cliente)
+                }
             }
         }
         item { Spacer(modifier = Modifier.height(20.dp)) }
@@ -653,13 +776,27 @@ private fun ResenasBarberoTab(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 4 — MIS HORARIOS
+// TAB 3 — MIS HORARIOS
 // ══════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun HorariosBarberoTab(
     uiState: com.example.barberia.viewmodel.BarberoUiState,
     colores: BarberiaColores
 ) {
+    val diaCompleto = mapOf(
+        DiaSemanaEnum.LUNES to "Lunes", DiaSemanaEnum.MARTES to "Martes",
+        DiaSemanaEnum.MIERCOLES to "Miércoles", DiaSemanaEnum.JUEVES to "Jueves",
+        DiaSemanaEnum.VIERNES to "Viernes", DiaSemanaEnum.SABADO to "Sábado",
+        DiaSemanaEnum.DOMINGO to "Domingo"
+    )
+
+    val diasConHorario = uiState.horarios.map { it.diaSemana }.toSet()
+    val todosDias = DiaSemanaEnum.entries.map { dia ->
+        val horariosDia = uiState.horarios.filter { it.diaSemana == dia }
+        val esDescanso = horariosDia.isEmpty()
+        Triple(dia, horariosDia, esDescanso)
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(colores.fondo)
             .padding(horizontal = 20.dp),
@@ -689,38 +826,139 @@ private fun HorariosBarberoTab(
                 }
             }
         } else {
-            val horariosPorDia = DiaSemanaEnum.entries.map { dia ->
-                dia to uiState.horarios.filter { it.diaSemana == dia }
-            }
-            horariosPorDia.forEach { (dia, horarios) ->
-                if (horarios.isNotEmpty()) {
-                    item {
-                        Text(dia.name.lowercase().replaceFirstChar { it.uppercase() },
+            todosDias.forEach { (dia, horariosDia, esDescanso) ->
+                item {
+                    if (esDescanso) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = ColorError.copy(alpha = 0.08f)),
+                            elevation = CardDefaults.cardElevation(
+                                defaultElevation = colores.sombra.dp)
+                        ) {
+                            Row(modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Filled.Bedtime, null,
+                                    tint = ColorError, modifier = Modifier.size(20.dp))
+                                Text(diaCompleto[dia] ?: dia.name,
+                                    color = ColorError, fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.weight(1f))
+                                Text("Día de descanso", color = ColorError.copy(alpha = 0.7f),
+                                    fontSize = 11.sp)
+                            }
+                        }
+                    } else {
+                        Text(diaCompleto[dia] ?: dia.name,
                             color = ColorAzul, fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(top = 4.dp))
                     }
-                    items(horarios) { horario ->
-                        Card(modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = colores.superficie),
-                            elevation = CardDefaults.cardElevation(
-                                defaultElevation = colores.sombra.dp)) {
-                            Row(modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Box(modifier = Modifier.size(40.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(ColorAzul.copy(0.15f)),
-                                    contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Filled.Schedule, null,
-                                        tint = ColorAzul, modifier = Modifier.size(20.dp))
+                }
+
+                if (!esDescanso) {
+                    for (horario in horariosDia) {
+                        item {
+                            val bloquesDelDia = remember(horario.horaInicio, horario.horaFin) {
+                                val ini = horario.horaInicio?.take(5) ?: "09:00"
+                                val fin = horario.horaFin?.take(5) ?: "19:00"
+                                val startH = ini.substringBefore(":").toIntOrNull() ?: 9
+                                val startM = ini.substringAfter(":").toIntOrNull() ?: 0
+                                val endH = fin.substringBefore(":").toIntOrNull() ?: 19
+                                val endM = fin.substringAfter(":").toIntOrNull() ?: 0
+                                val blks = mutableListOf<String>()
+                                var h = startH
+                                var m = startM
+                                while (h < endH || (h == endH && m < endM)) {
+                                    val nextH = if (m == 0) h else h + 1
+                                    val nextM = if (m == 0) 30 else 0
+                                    blks.add("%02d:%02d-%02d:%02d".format(h, m, nextH, nextM))
+                                    h = nextH; m = nextM
                                 }
-                                Column {
+                                blks
+                            }
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth().shadow(4.dp, RoundedCornerShape(14.dp)),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = colores.superficie)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
                                     Text("${horario.horaInicio?.take(5)} - ${horario.horaFin?.take(5)}",
                                         color = colores.texto,
-                                        fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                        fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    val blockChunks = bloquesDelDia.chunked(4)
+                                    blockChunks.forEach { row ->
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                                        ) {
+                                            row.forEach { blk ->
+                                                val ocupado = uiState.citasConDetalle.any { det ->
+                                                    val ci = det.cita.horaInicio?.take(5) ?: ""
+                                                    val cf = det.cita.horaFin?.take(5) ?: ""
+                                                    ci < blk.substringAfter("-").take(5) &&
+                                                            cf > blk.take(5)
+                                                }
+                                                val esBloqueo = uiState.bloqueos.any { b ->
+                                                    val bi = b.fechaInicio?.substringAfter("T")?.take(5) ?: ""
+                                                    val bf = b.fechaFin?.substringAfter("T")?.take(5) ?: ""
+                                                    bi <= blk.substringAfter("-").take(5) && bf >= blk.take(5)
+                                                }
+                                                val detOcupado = if (ocupado) {
+                                                    uiState.citasConDetalle.find { det ->
+                                                        val ci = det.cita.horaInicio?.take(5) ?: ""
+                                                        val cf = det.cita.horaFin?.take(5) ?: ""
+                                                        ci < blk.substringAfter("-").take(5) &&
+                                                                cf > blk.take(5)
+                                                    }
+                                                } else null
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(
+                                                            when {
+                                                                esBloqueo -> ColorAzul.copy(alpha = 0.2f)
+                                                                ocupado -> ColorVerde.copy(alpha = 0.15f)
+                                                                else -> colores.superficie2
+                                                            }
+                                                        )
+                                                        .border(
+                                                            0.5.dp,
+                                                            when {
+                                                                esBloqueo -> ColorAzul.copy(alpha = 0.4f)
+                                                                ocupado -> ColorVerde.copy(alpha = 0.3f)
+                                                                else -> colores.borde
+                                                            },
+                                                            RoundedCornerShape(6.dp)
+                                                        )
+                                                        .padding(horizontal = 4.dp, vertical = 3.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    if (esBloqueo) {
+                                                        Text("Descanso", color = ColorAzul,
+                                                            fontSize = 8.sp, fontWeight = FontWeight.Medium,
+                                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                    } else if (detOcupado != null) {
+                                                        Text(
+                                                            "${detOcupado.clienteNombre.take(6)} - ${detOcupado.servicioNombre.take(8)}",
+                                                            color = ColorVerde, fontSize = 7.sp,
+                                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                    } else {
+                                                        Text(blk, color = colores.textoSub,
+                                                            fontSize = 7.sp,
+                                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -736,11 +974,11 @@ private fun HorariosBarberoTab(
 // COMPONENTES
 // ══════════════════════════════════════════════════════════════════════════════
 
-// Tarjeta de cita con botones de acción según el estado
 @Composable
 private fun TarjetaCitaBarbero(
     cita: CitaDTO,
     colores: BarberiaColores,
+    onClick: () -> Unit,
     onIniciar: () -> Unit,
     onFinalizar: () -> Unit,
     onNoPresento: () -> Unit
@@ -754,12 +992,16 @@ private fun TarjetaCitaBarbero(
         null                         -> colores.textoSub
     }
 
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colores.superficie),
-        elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(14.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = colores.superficie)
+    ) {
         Column {
             Row {
-                // Barra lateral de color según estado
                 Box(modifier = Modifier.width(4.dp).height(90.dp).background(colorEstado))
                 Column(modifier = Modifier.weight(1f)
                     .padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -767,7 +1009,6 @@ private fun TarjetaCitaBarbero(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Top) {
                         Column {
-                            // Hora de inicio destacada
                             Text(cita.horaInicio?.take(5) ?: "--:--",
                                 color = ColorAzul, fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold)
@@ -780,7 +1021,6 @@ private fun TarjetaCitaBarbero(
                             Text("Servicio #${cita.idServicio}",
                                 color = colores.textoSub, fontSize = 12.sp)
                         }
-                        // Badge de estado
                         Box(modifier = Modifier.clip(RoundedCornerShape(8.dp))
                             .background(colorEstado.copy(alpha = 0.15f))
                             .padding(horizontal = 10.dp, vertical = 4.dp)) {
@@ -801,35 +1041,40 @@ private fun TarjetaCitaBarbero(
                 }
             }
 
-            // Botones de acción — aparecen solo según el estado actual
-            // PENDIENTE → puede iniciar o marcar no presentado
-            // EN_CURSO  → puede finalizar
             if (cita.estado == EstadoCitaEnum.PENDIENTE ||
                 cita.estado == EstadoCitaEnum.EN_CURSO) {
                 HorizontalDivider(color = colores.borde)
-                Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(modifier = Modifier
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (cita.estado == EstadoCitaEnum.PENDIENTE) {
-                        TextButton(onClick = onIniciar) {
-                            Icon(Icons.Filled.PlayArrow, null,
-                                modifier = Modifier.size(16.dp), tint = ColorAzul)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Iniciar", color = ColorAzul, fontSize = 13.sp)
-                        }
-                        TextButton(onClick = onNoPresento) {
-                            Icon(Icons.Filled.PersonOff, null,
-                                modifier = Modifier.size(16.dp), tint = ColorError)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("No se presentó", color = ColorError, fontSize = 13.sp)
-                        }
+                        BotonBarberoAnimado(
+                            text = "Iniciar",
+                            icon = Icons.Filled.PlayArrow,
+                            color = ColorAzul,
+                            colores = colores,
+                            modifier = Modifier.weight(1f),
+                            onClick = onIniciar
+                        )
+                        BotonBarberoAnimado(
+                            text = "No presentó",
+                            icon = Icons.Filled.PersonOff,
+                            color = ColorError,
+                            colores = colores,
+                            modifier = Modifier.weight(1f),
+                            onClick = onNoPresento
+                        )
                     }
                     if (cita.estado == EstadoCitaEnum.EN_CURSO) {
-                        TextButton(onClick = onFinalizar) {
-                            Icon(Icons.Filled.CheckCircle, null,
-                                modifier = Modifier.size(16.dp), tint = ColorVerde)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Finalizar", color = ColorVerde, fontSize = 13.sp)
-                        }
+                        BotonBarberoAnimado(
+                            text = "Finalizar",
+                            icon = Icons.Filled.CheckCircle,
+                            color = ColorVerde,
+                            colores = colores,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onFinalizar
+                        )
                     }
                 }
             }
@@ -837,16 +1082,15 @@ private fun TarjetaCitaBarbero(
     }
 }
 
-// Tarjeta de bloqueo con botón eliminar
 @Composable
 private fun TarjetaBloqueoBarbero(
     bloqueo: BloqueoHorarioDTO,
     colores: BarberiaColores,
     onEliminar: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = colores.superficie),
-        elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+    Card(modifier = Modifier.fillMaxWidth().shadow(4.dp, RoundedCornerShape(14.dp)),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = colores.superficie)) {
         Row(modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {
@@ -864,7 +1108,7 @@ private fun TarjetaBloqueoBarbero(
                         fontSize = 14.sp, fontWeight = FontWeight.Medium,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        text = "${bloqueo.fechaInicio?.take(10)} → ${bloqueo.fechaFin?.take(10)}",
+                        text = "${bloqueo.fechaInicio?.take(10)} \u2192 ${bloqueo.fechaFin?.take(10)}",
                         color = colores.textoSub, fontSize = 12.sp
                     )
                 }
@@ -877,19 +1121,22 @@ private fun TarjetaBloqueoBarbero(
     }
 }
 
-// Tarjeta de reseña
 @Composable
-private fun TarjetaResenaBarbero(resena: ResenaDTO, colores: BarberiaColores) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = colores.superficie),
-        elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+private fun TarjetaResenaBarbero(
+    resena: ResenaDTO,
+    colores: BarberiaColores,
+    clienteNombre: String = "Cliente"
+) {
+    Card(modifier = Modifier.fillMaxWidth().shadow(4.dp, RoundedCornerShape(14.dp)),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = colores.superficie)) {
         Column(modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
-                Text("Cita #${resena.idCita}", color = colores.textoSub, fontSize = 12.sp)
-                // Estrellas
+                Text(clienteNombre, color = colores.texto,
+                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     (1..5).forEach { i ->
                         Icon(
@@ -910,25 +1157,33 @@ private fun TarjetaResenaBarbero(resena: ResenaDTO, colores: BarberiaColores) {
     }
 }
 
-// Stat del barbero (3 en fila)
 @Composable
 private fun StatBarbero(
     numero: String, label: String, color: Color,
-    colores: BarberiaColores, modifier: Modifier = Modifier
+    colores: BarberiaColores, modifier: Modifier = Modifier,
+    activo: Boolean = false, onClick: (() -> Unit)? = null
 ) {
-    Card(modifier = modifier, shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = colores.superficie),
-        elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+    val bgColor = if (activo) color.copy(alpha = 0.12f) else colores.superficie
+    val borderMod = if (activo) Modifier.border(1.5.dp, color, RoundedCornerShape(12.dp))
+    else Modifier
+
+    Card(
+        modifier = modifier
+            .then(borderMod)
+            .shadow(4.dp, RoundedCornerShape(12.dp))
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor)
+    ) {
         Column(modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
             Text(numero, color = color, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text(label, color = colores.textoSub, fontSize = 10.sp,
+            Text(label, color = if (activo) color else colores.textoSub, fontSize = 10.sp,
                 textAlign = TextAlign.Center)
         }
     }
 }
 
-// Título de sección con barra azul
 @Composable
 private fun SeccionTituloBarbero(texto: String, colores: BarberiaColores) {
     Row(verticalAlignment = Alignment.CenterVertically,
@@ -939,53 +1194,44 @@ private fun SeccionTituloBarbero(texto: String, colores: BarberiaColores) {
     }
 }
 
-// Campo de fecha que abre calendario al tocar
 @Composable
-private fun CampoFechaBarbero(
-    label: String, valor: String,
-    colores: BarberiaColores, onClick: () -> Unit
+private fun BotonBarberoAnimado(
+    text: String,
+    color: Color,
+    colores: BarberiaColores? = null,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+    onClick: () -> Unit
 ) {
-    Column {
-        Text(label, color = colores.textoSub, fontSize = 12.sp,
-            letterSpacing = 0.5.sp, modifier = Modifier.padding(bottom = 6.dp))
-        Box(modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(colores.superficie)
-            .border(1.dp,
-                if (valor.isNotBlank()) ColorAzul else colores.borde,
-                RoundedCornerShape(12.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Filled.CalendarMonth, null,
-                    tint = ColorAzul, modifier = Modifier.size(20.dp))
-                Text(
-                    text = if (valor.isNotBlank()) valor else "Toca para abrir el calendario",
-                    color = if (valor.isNotBlank()) colores.texto else colores.textoSub,
-                    fontSize = 14.sp
-                )
-            }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "btnScale"
+    )
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        modifier = modifier
+            .height(52.dp)
+            .scale(scale),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = color,
+            disabledContainerColor = colores?.borde ?: color.copy(alpha = 0.4f)
+        )
+    ) {
+        if (icon != null) {
+            Icon(icon, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
         }
+        Text(text, fontWeight = FontWeight.SemiBold)
     }
 }
 
-// Colores del DatePicker adaptados al tema — acento azul para barbero
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun datePickerColores(colores: BarberiaColores) = DatePickerDefaults.colors(
-    containerColor            = colores.superficie,
-    titleContentColor         = colores.texto,
-    headlineContentColor      = ColorAzul,
-    weekdayContentColor       = colores.textoSub,
-    dayContentColor           = colores.texto,
-    selectedDayContainerColor = ColorAzul,
-    selectedDayContentColor   = Color.White,
-    todayDateBorderColor      = ColorAzul,
-    todayContentColor         = ColorAzul
-)
-
-// Botón icono con animación spring
 @Composable
 private fun BotonIconoBarbero(
     icono: ImageVector, tint: Color, onClick: () -> Unit
@@ -1000,3 +1246,8 @@ private fun BotonIconoBarbero(
         Icon(icono, null, tint = tint, modifier = Modifier.size(22.dp))
     }
 }
+
+
+
+
+

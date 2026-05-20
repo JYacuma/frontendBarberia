@@ -52,6 +52,7 @@ fun RegisterScreen(
 
     var nombre          by remember { mutableStateOf("") }
     var correo          by remember { mutableStateOf("") }
+    var telefono        by remember { mutableStateOf("") }
     var password        by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -143,13 +144,7 @@ fun RegisterScreen(
                         }
 
                         // Botón modo claro/oscuro
-                        IconButton(onClick = {
-                            TemaManager.modoOscuro.value = when (TemaManager.modoOscuro.value) {
-                                null  -> !colores.esModoOscuro  // invierte lo que el sistema tiene
-                                true  -> false                  // oscuro → claro
-                                false -> null                   // claro → sistema
-                            }
-                        }) {
+                        IconButton(onClick = { TemaManager.toggleModo() }) {
                             Icon(
                                 imageVector = when (TemaManager.modoOscuro.value) {
                                     null  -> Icons.Filled.BrightnessMedium
@@ -324,13 +319,10 @@ fun RegisterScreen(
                         onPasswordToggle = { passwordVisible = !passwordVisible },
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
-                            imeAction    = ImeAction.Done
+                            imeAction    = ImeAction.Next
                         ),
                         keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                viewModel.register(nombre, correo, password, confirmPassword)
-                            }
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         )
                     )
 
@@ -344,6 +336,27 @@ fun RegisterScreen(
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
+                }
+
+                // Teléfono (opcional)
+                Column {
+                    LabelCampo("Teléfono (opcional)", telefono.length >= 7)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    BarberiaTextField(
+                        value         = telefono,
+                        onValueChange = { telefono = it; viewModel.clearError() },
+                        label         = "Ej: 3001234567",
+                        leadingIcon   = Icons.Filled.Phone,
+                        accentColor   = ColorAzul,
+                        colores       = colores,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Phone,
+                            imeAction    = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = { focusManager.clearFocus() }
+                        )
+                    )
                 }
 
                 // Error del backend
@@ -375,7 +388,6 @@ fun RegisterScreen(
                         password.length >= 6 &&
                         password == confirmPassword
 
-                // Botón crear cuenta — azul cuando listo, gris cuando no
                 BarberiaBoton(
                     texto      = "Crear cuenta",
                     icono      = Icons.Filled.PersonAdd,
@@ -384,7 +396,10 @@ fun RegisterScreen(
                     onClick    = {
                         if (formListo) {
                             focusManager.clearFocus()
-                            viewModel.register(nombre, correo, password, confirmPassword)
+                            viewModel.register(
+                                nombre, correo, password, confirmPassword,
+                                telefono.ifBlank { null }
+                            )
                         }
                     }
                 )

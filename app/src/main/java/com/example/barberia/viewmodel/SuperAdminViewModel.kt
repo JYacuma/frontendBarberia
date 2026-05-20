@@ -9,17 +9,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-// Estado completo de la pantalla del SuperAdmin
-// Tiene todo lo del Admin + gestión completa de usuarios
 data class SuperAdminUiState(
     val isLoading: Boolean = false,
     val usuarios: List<UsuarioDTO> = emptyList(),
     val usuariosPorRol: List<UsuarioDTO> = emptyList(),
     val barberos: List<BarberoDTO> = emptyList(),
     val servicios: List<ServicioDTO> = emptyList(),
+    val serviciosConDetalle: List<ServicioConDetalle> = emptyList(),
     val todasLasCitas: List<CitaDTO> = emptyList(),
     val citasHoy: List<CitaDTO> = emptyList(),
+    val citasConDetalles: List<CitaConDetalle> = emptyList(),
+    val promediosBarbero: Map<Long, Double> = emptyMap(),
     val notificaciones: List<NotificacionDTO> = emptyList(),
+    val notificacionesCount: Int = 0,
     val errorMessage: String? = null,
     val successMessage: String? = null
 )
@@ -42,29 +44,67 @@ class SuperAdminViewModel(
 
     init { cargarDatosIniciales() }
 
-    // Carga todo — usuarios, barberos, servicios, citas y notificaciones
     fun cargarDatosIniciales() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val usuarios  = apiService.getUsuarios()
-                val barberos  = apiService.getBarberos()
-                val servicios = apiService.getServicios()
-                val citas     = apiService.getCitas()
+                val usuariosResponse   = apiService.getUsuarios()
+                val barberosResponse   = apiService.getBarberos()
+                val serviciosResponse  = apiService.getServicios()
+                val citasResponse      = apiService.getCitas()
 
-                val todasLasCitas = if (citas.isSuccessful) citas.body() ?: emptyList()
-                else emptyList()
+                val usuarios  = if (usuariosResponse.isSuccessful) usuariosResponse.body() ?: emptyList() else emptyList()
+                val barberos  = if (barberosResponse.isSuccessful) barberosResponse.body() ?: emptyList() else emptyList()
+                val servicios = if (serviciosResponse.isSuccessful) serviciosResponse.body() ?: emptyList() else emptyList()
+                val todasLasCitas = if (citasResponse.isSuccessful) citasResponse.body() ?: emptyList() else emptyList()
+
+                val citasConDetalles = todasLasCitas.map { cita ->
+                    val barbero = barberos.find { it.idBarbero == cita.idBarbero }
+                    val servicio = servicios.find { it.idServicio == cita.idServicio }
+                    val usuario = usuarios.find { it.idUsuario == cita.idUsuario }
+                    CitaConDetalle(
+                        cita = cita,
+                        clienteNombre = usuario?.nombre ?: "Desconocido",
+                        barberoNombre = barbero?.nombre ?: "Desconocido",
+                        servicioNombre = servicio?.nombre ?: "Desconocido",
+                        precio = servicio?.precio ?: 0.0
+                    )
+                }
+
+                val serviciosConDetalle = servicios.map { servicio ->
+                    val citasDelServicio = todasLasCitas.filter { it.idServicio == servicio.idServicio }
+                    val barberosIds = citasDelServicio.map { it.idBarbero }.distinct()
+                    val clientesIds = citasDelServicio.map { it.idUsuario }.distinct()
+                    ServicioConDetalle(
+                        servicio = servicio,
+                        barberoDTOs = barberos.filter { it.idBarbero in barberosIds },
+                        clienteDTOs = usuarios.filter { it.idUsuario in clientesIds }
+                    )
+                }
+
+                val resenas = mutableListOf<ResenaDTO>()
+                barberos.forEach { barbero ->
+                    val res = apiService.getResenasByBarbero(barbero.idBarbero!!)
+                    if (res.isSuccessful) resenas.addAll(res.body() ?: emptyList())
+                }
+                val promediosBarbero = barberos.associate { barbero ->
+                    val r = resenas.filter { it.idBarbero == barbero.idBarbero }
+                    barbero.idBarbero!! to (if (r.isEmpty()) 0.0 else r.map { it.calificacion }.average())
+                }
+
+                val citasHoyList = todasLasCitas.filter { it.fecha == fechaHoy }
 
                 _uiState.value = _uiState.value.copy(
-                    isLoading     = false,
-                    usuarios      = if (usuarios.isSuccessful)
-                        usuarios.body() ?: emptyList() else emptyList(),
-                    barberos      = if (barberos.isSuccessful)
-                        barberos.body() ?: emptyList() else emptyList(),
-                    servicios     = if (servicios.isSuccessful)
-                        servicios.body() ?: emptyList() else emptyList(),
-                    todasLasCitas = todasLasCitas,
-                    citasHoy      = todasLasCitas.filter { it.fecha == fechaHoy }
+                    isLoading            = false,
+                    usuarios             = usuarios,
+                    barberos             = barberos,
+                    servicios            = servicios,
+                    serviciosConDetalle  = serviciosConDetalle,
+                    todasLasCitas        = todasLasCitas,
+                    citasHoy             = citasHoyList,
+                    citasConDetalles     = citasConDetalles,
+                    promediosBarbero     = promediosBarbero,
+                    notificacionesCount  = citasHoyList.size
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -75,26 +115,14 @@ class SuperAdminViewModel(
         }
     }
 
-    // ── Gestión de Usuarios (exclusivo SuperAdmin) ────────────────────────
+    // ── Gestión de Usuarios ────────────────────────────────────────────────
 
-    // POST /api/usuarios — crea cualquier tipo de usuario con cualquier rol
-    fun crearUsuario(
-        nombre: String, correo: String,
-        password: String, rol: RolEnum
-    ) {
+    fun crearUsuario(nombre: String, correo: String, password: String, rol: RolEnum) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val response = apiService.createUsuario(
-                    UsuarioDTO(
-                        idUsuario = null,
-                        nombre    = nombre,
-                        correo    = correo,
-                        telefono  = null,
-                        password  = password,  // ⭐ AHORA SÍ FUNCIONA
-                        rol       = rol,
-                        activo    = true
-                    )
+                    UsuarioDTO(null, nombre, correo, null, password, rol, true)
                 )
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
@@ -109,15 +137,11 @@ class SuperAdminViewModel(
                     )
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading    = false,
-                    errorMessage = "Sin conexión."
-                )
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Sin conexión.")
             }
         }
     }
 
-    // PUT /api/usuarios/{id} — activa o desactiva un usuario
     fun toggleActivoUsuario(usuario: UsuarioDTO) {
         viewModelScope.launch {
             try {
@@ -125,16 +149,12 @@ class SuperAdminViewModel(
                 val response = apiService.updateUsuario(usuario.idUsuario!!, actualizado)
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
-                        successMessage = if (actualizado.activo == true)
-                            "${usuario.nombre} activado"
-                        else
-                            "${usuario.nombre} desactivado"
+                        successMessage = if (actualizado.activo == true) "${usuario.nombre} activado"
+                        else "${usuario.nombre} desactivado"
                     )
                     cargarDatosIniciales()
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = "Error al actualizar usuario (${response.code()})"
-                    )
+                    _uiState.value = _uiState.value.copy(errorMessage = "Error al actualizar usuario (${response.code()})")
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Sin conexión.")
@@ -142,21 +162,15 @@ class SuperAdminViewModel(
         }
     }
 
-    // DELETE /api/usuarios/{id} — elimina un usuario permanentemente
-    // Solo SuperAdmin puede hacer esto
     fun eliminarUsuario(idUsuario: Long) {
         viewModelScope.launch {
             try {
                 val response = apiService.deleteUsuario(idUsuario)
                 if (response.isSuccessful) {
-                    _uiState.value = _uiState.value.copy(
-                        successMessage = "Usuario eliminado"
-                    )
+                    _uiState.value = _uiState.value.copy(successMessage = "Usuario eliminado")
                     cargarDatosIniciales()
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = "Error al eliminar usuario (${response.code()})"
-                    )
+                    _uiState.value = _uiState.value.copy(errorMessage = "Error al eliminar usuario (${response.code()})")
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Sin conexión.")
@@ -164,16 +178,51 @@ class SuperAdminViewModel(
         }
     }
 
-    // ── Gestión de Barberos ───────────────────────────────────────────────
+    fun editarUsuario(id: Long, nombre: String, telefono: String?, rol: RolEnum, activo: Boolean) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val original = _uiState.value.usuarios.find { it.idUsuario == id }
+                val dto = UsuarioDTO(
+                    idUsuario = id,
+                    nombre    = nombre,
+                    correo    = original?.correo ?: "",
+                    telefono  = telefono,
+                    rol       = rol,
+                    activo    = activo
+                )
+                val response = apiService.updateUsuario(id, dto)
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading      = false,
+                        successMessage = "Usuario '$nombre' actualizado"
+                    )
+                    cargarDatosIniciales()
+                } else if (response.code() == 409) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading    = false,
+                        errorMessage = "Este correo o teléfono ya está en uso"
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading    = false,
+                        errorMessage = "Error al actualizar usuario (${response.code()})"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Sin conexión.")
+            }
+        }
+    }
+
+    // ── Gestión de Barberos ────────────────────────────────────────────────
 
     fun crearBarbero(nombre: String, especialidad: String, telefono: String, idUsuarioVinculado: Long? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val response = apiService.createBarbero(
-                    BarberoDTO(null, nombre,
-                        especialidad.ifBlank { null },
-                        telefono.ifBlank { null }, true, idUsuarioVinculado)
+                    BarberoDTO(null, nombre, especialidad.ifBlank { null }, telefono.ifBlank { null }, true, idUsuarioVinculado)
                 )
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
@@ -188,8 +237,39 @@ class SuperAdminViewModel(
                     )
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false, errorMessage = "Sin conexión.")
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Sin conexión.")
+            }
+        }
+    }
+
+    fun editarBarbero(id: Long, nombre: String, especialidad: String, telefono: String, idUsuario: Long?) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val response = apiService.updateBarbero(
+                    id,
+                    BarberoDTO(idBarbero = id, nombre = nombre, especialidad = especialidad.ifBlank { null },
+                        telefono = telefono.ifBlank { null }, activo = true, idUsuario = idUsuario)
+                )
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        successMessage = "Barbero '$nombre' actualizado"
+                    )
+                    cargarDatosIniciales()
+                } else if (response.code() == 409) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "Este teléfono ya está registrado, usa otro"
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "Error al actualizar barbero (${response.code()})"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Sin conexión.")
             }
         }
     }
@@ -197,13 +277,23 @@ class SuperAdminViewModel(
     fun eliminarBarbero(idBarbero: Long) {
         viewModelScope.launch {
             try {
+                val pendientes = _uiState.value.todasLasCitas.filter {
+                    it.idBarbero == idBarbero && it.estado == EstadoCitaEnum.PENDIENTE
+                }
+                pendientes.forEach { cita ->
+                    apiService.cancelarCita(cita.idCita!!)
+                }
                 val response = apiService.deleteBarbero(idBarbero)
                 if (response.isSuccessful) {
-                    _uiState.value = _uiState.value.copy(successMessage = "Barbero eliminado")
+                    val msg = if (pendientes.isNotEmpty()) {
+                        "Barbero eliminado. ${pendientes.size} cita(s) cancelada(s). Se notificó a los clientes."
+                    } else {
+                        "Barbero eliminado"
+                    }
+                    _uiState.value = _uiState.value.copy(successMessage = msg)
                     cargarDatosIniciales()
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = "Error al eliminar barbero")
+                    _uiState.value = _uiState.value.copy(errorMessage = "Error al eliminar barbero")
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Sin conexión.")
@@ -218,13 +308,12 @@ class SuperAdminViewModel(
                 val response = apiService.updateBarbero(barbero.idBarbero!!, actualizado)
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
-                        successMessage = if (actualizado.activo == true)
-                            "${barbero.nombre} activado" else "${barbero.nombre} desactivado"
+                        successMessage = if (actualizado.activo == true) "${barbero.nombre} activado"
+                        else "${barbero.nombre} desactivado"
                     )
                     cargarDatosIniciales()
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = "Error al actualizar barbero")
+                    _uiState.value = _uiState.value.copy(errorMessage = "Error al actualizar barbero")
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Sin conexión.")
@@ -234,16 +323,12 @@ class SuperAdminViewModel(
 
     // ── Gestión de Servicios ──────────────────────────────────────────────
 
-    fun crearServicio(
-        nombre: String, descripcion: String,
-        precio: Double, duracionMinutos: Int
-    ) {
+    fun crearServicio(nombre: String, descripcion: String, precio: Double, duracionMinutos: Int) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val response = apiService.createServicio(
-                    ServicioDTO(null, nombre,
-                        descripcion.ifBlank { null }, precio, duracionMinutos)
+                    ServicioDTO(null, nombre, descripcion.ifBlank { null }, precio, duracionMinutos)
                 )
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
@@ -258,8 +343,30 @@ class SuperAdminViewModel(
                     )
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false, errorMessage = "Sin conexión.")
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Sin conexión.")
+            }
+        }
+    }
+
+    fun actualizarServicio(servicio: ServicioDTO) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val response = apiService.updateServicio(servicio.idServicio!!, servicio)
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        successMessage = "Servicio actualizado"
+                    )
+                    cargarDatosIniciales()
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "Error al actualizar servicio (${response.code()})"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Sin conexión.")
             }
         }
     }
@@ -272,8 +379,7 @@ class SuperAdminViewModel(
                     _uiState.value = _uiState.value.copy(successMessage = "Servicio eliminado")
                     cargarDatosIniciales()
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = "Error al eliminar servicio")
+                    _uiState.value = _uiState.value.copy(errorMessage = "Error al eliminar servicio")
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Sin conexión.")
@@ -291,8 +397,7 @@ class SuperAdminViewModel(
                     _uiState.value = _uiState.value.copy(successMessage = "Cita cancelada")
                     cargarDatosIniciales()
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        errorMessage = "Error al cancelar la cita")
+                    _uiState.value = _uiState.value.copy(errorMessage = "Error al cancelar la cita")
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Sin conexión.")
@@ -305,18 +410,14 @@ class SuperAdminViewModel(
             try {
                 val response = apiService.getUsuariosByRol(rol)
                 _uiState.value = _uiState.value.copy(
-                    usuariosPorRol = if (response.isSuccessful)
-                        response.body() ?: emptyList() else emptyList()
+                    usuariosPorRol = if (response.isSuccessful) response.body() ?: emptyList() else emptyList()
                 )
             } catch (_: Exception) { }
         }
     }
 
     fun clearMessages() {
-        _uiState.value = _uiState.value.copy(
-            errorMessage   = null,
-            successMessage = null
-        )
+        _uiState.value = _uiState.value.copy(errorMessage = null, successMessage = null)
     }
 
     companion object {

@@ -49,7 +49,7 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         }
     }
 
-    fun register(nombre: String, correo: String, password: String, confirmPassword: String) {
+    fun register(nombre: String, correo: String, password: String, confirmPassword: String, telefono: String? = null) {
         if (nombre.isBlank() || correo.isBlank() || password.isBlank()) {
             _uiState.value = _uiState.value.copy(
                 errorMessage = "Por favor completa todos los campos"
@@ -72,7 +72,7 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
-            when (val result = authRepository.register(nombre, correo, password)) {
+            when (val result = authRepository.register(nombre, correo, password, telefono)) {
                 is Result.Success -> _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     registerSuccess = result.data

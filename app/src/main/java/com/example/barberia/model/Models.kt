@@ -1,5 +1,13 @@
 package com.example.barberia.model
 
+import java.text.Normalizer
+
+fun getInitials(name: String): String {
+    val ascii = Normalizer.normalize(name, Normalizer.Form.NFD)
+        .replace(Regex("[^\\p{ASCII}]"), "")
+    return ascii.split(" ").filter { it.isNotBlank() }.take(2).joinToString("") { it.first().uppercase() }
+}
+
 // ── AUTH ───────────────────────────────────────────────────────────────────
 
 data class LoginRequest(
@@ -19,7 +27,8 @@ data class LoginResponse(
 data class RegisterRequest(
     val nombre: String,
     val correoOTelefono: String,
-    val password: String
+    val password: String,
+    val telefono: String? = null
 )
 
 data class RegisterResponse(
@@ -148,4 +157,22 @@ data class NotificacionDTO(
     val tipo: TipoNotificacionEnum,
     val mensaje: String? = null,
     val enviado: Boolean? = false
+)
+
+// ── DETALLE COMPUESTO ──────────────────────────────────────────────────────
+
+data class CitaConDetalle(
+    val cita: CitaDTO,
+    val clienteNombre: String = "",
+    val barberoNombre: String = "",
+    val servicioNombre: String = "",
+    val precio: Double = 0.0
+)
+
+data class ServicioConDetalle(
+    val servicio: ServicioDTO,
+    val barberos: List<String> = emptyList(),
+    val clientes: List<String> = emptyList(),
+    val barberoDTOs: List<BarberoDTO> = emptyList(),
+    val clienteDTOs: List<UsuarioDTO> = emptyList()
 )

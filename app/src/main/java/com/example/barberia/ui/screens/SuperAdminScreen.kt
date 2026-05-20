@@ -6,7 +6,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -20,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,9 +27,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,10 +41,11 @@ import com.example.barberia.network.ApiService
 import com.example.barberia.ui.auth.BarberiaBoton
 import com.example.barberia.ui.auth.BarberiaTextField
 import com.example.barberia.ui.theme.*
+
 import com.example.barberia.viewmodel.SuperAdminViewModel
 import kotlinx.coroutines.launch
+import java.text.Normalizer
 
-// Acento del SuperAdmin — dorado exclusivo
 private val SuperAccent     = ColorDorado
 private val SuperAccentSoft = ColorDorado.copy(alpha = 0.15f)
 
@@ -53,17 +54,11 @@ private val SuperAccentSoft = ColorDorado.copy(alpha = 0.15f)
 fun SuperAdminScreen(
     apiService: ApiService,
     nombre: String,
-    onLogout: () -> Unit
-) {
-    val colores       = LocalBarberiaColores.current
-    val sistemaOscuro = isSystemInDarkTheme()
-
-    val viewModel: SuperAdminViewModel = viewModel(
-        factory = SuperAdminViewModel.factory(apiService)
-    )
+    onLogout: () -> Unit,
+    onNavigateToNotificaciones: () -> Unit = {}
+)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 5 tabs: Inicio, Usuarios, Barberos, Servicios, Citas
     val pagerState    = rememberPagerState(pageCount = { 5 })
     val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
@@ -105,7 +100,9 @@ fun SuperAdminScreen(
         ) { pagina ->
             when (pagina) {
                 0 -> SuperInicioTab(nombre, uiState, viewModel,
-                    onLogout, colores, sistemaOscuro)
+                    onLogout, colores,
+                    onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
+                    onNavigateToNotificaciones = onNavigateToNotificaciones)
                 1 -> SuperUsuariosTab(uiState, viewModel, colores)
                 2 -> SuperBarberosTab(uiState, viewModel, colores)
                 3 -> SuperServiciosTab(uiState, viewModel, colores)
@@ -117,7 +114,7 @@ fun SuperAdminScreen(
 
 // ── Bottom Bar — 5 tabs, acento dorado ───────────────────────────────────────
 @Composable
-private fun SuperAdminBottomBar(
+fun SuperAdminBottomBar(
     paginaActual: Int,
     colores: BarberiaColores,
     onTabSelected: (Int) -> Unit
@@ -155,161 +152,203 @@ private fun SuperAdminBottomBar(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 1 — INICIO (Control total)
+// TAB 0 — INICIO
 // ══════════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SuperInicioTab(
+fun SuperInicioTab(
     nombre: String,
     uiState: com.example.barberia.viewmodel.SuperAdminUiState,
     viewModel: SuperAdminViewModel,
     onLogout: () -> Unit,
     colores: BarberiaColores,
-    sistemaOscuro: Boolean
+    onNavigateToTab: (Int) -> Unit,
+    onNavigateToNotificaciones: () -> Unit = {}
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-    ) {
-        // ── Header dorado ─────────────────────────────────────────────────
-        item {
-            Box(modifier = Modifier.fillMaxWidth().background(
-                Brush.verticalGradient(
-                    if (colores.esModoOscuro)
-                        listOf(Color(0xFF120E02), colores.fondo)
-                    else
-                        listOf(Color(0xFFFFFAF0), colores.fondo)
-                )
-            )) {
-                // Franja polo dorada para SuperAdmin
-                Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                    Brush.horizontalGradient(
-                        listOf(SuperAccent, ColorBlanco, SuperAccent,
-                            ColorBlanco, SuperAccent)
-                    )))
+    var isRefreshing by remember { mutableStateOf(false) }
 
-                Column(modifier = Modifier.padding(
-                    start = 20.dp, end = 20.dp, top = 52.dp, bottom = 20.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Filled.AdminPanelSettings, null,
-                                    tint = SuperAccent,
-                                    modifier = Modifier.size(14.dp))
-                                Text("SUPERADMIN", color = SuperAccent,
-                                    fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                                    letterSpacing = 2.sp)
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Control total", color = colores.texto,
-                                fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            Text("$nombre · Acceso completo",
-                                color = colores.textoSub, fontSize = 13.sp)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            // Avatar corona dorada
-                            Box(modifier = Modifier.size(44.dp).clip(CircleShape)
-                                .background(SuperAccentSoft)
-                                .border(1.5.dp, SuperAccent, CircleShape),
-                                contentAlignment = Alignment.Center) {
-                                Icon(Icons.Filled.AdminPanelSettings, null,
-                                    tint = SuperAccent,
-                                    modifier = Modifier.size(22.dp))
-                            }
-                            IconButton(onClick = {
-                                TemaManager.modoOscuro.value = when (TemaManager.modoOscuro.value) {
-                                    null  -> !colores.esModoOscuro
-                                    true  -> false
-                                    false -> null
-                                }
-                            }) {
-                                Icon(
-                                    imageVector = when (TemaManager.modoOscuro.value) {
-                                        null  -> Icons.Filled.BrightnessMedium
-                                        true  -> Icons.Filled.DarkMode
-                                        false -> Icons.Filled.LightMode
-                                    },
-                                    contentDescription = "Modo",
-                                    tint = colores.textoSub,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            IconButton(onClick = onLogout) {
-                                Icon(Icons.AutoMirrored.Filled.Logout, null,
-                                    tint = colores.textoSub,
-                                    modifier = Modifier.size(22.dp))
-                            }
-                        }
-                    }
-                }
-            }
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.cargarDatosIniciales()
+            isRefreshing = false
         }
-
-        item { Spacer(modifier = Modifier.height(20.dp)) }
-
-        if (uiState.isLoading) {
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(colores.fondo)
+        ) {
             item {
-                Box(modifier = Modifier.fillMaxWidth().height(200.dp),
-                    contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = SuperAccent,
-                        strokeWidth = 2.5.dp, modifier = Modifier.size(36.dp))
+                Box(modifier = Modifier.fillMaxWidth().background(
+                    Brush.verticalGradient(
+                        if (colores.esModoOscuro)
+                            listOf(Color(0xFF120E02), colores.fondo)
+                        else
+                            listOf(Color(0xFFFFFAF0), colores.fondo)
+                    )
+                )) {
+                    Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+                        Brush.horizontalGradient(
+                            listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
+                        )))
+                    Column(modifier = Modifier.padding(
+                        start = 20.dp, end = 20.dp, top = 52.dp, bottom = 20.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top) {
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Box(modifier = Modifier.size(52.dp).clip(CircleShape)
+                                    .background(SuperAccent),
+                                    contentAlignment = Alignment.Center) {
+                                    Text(getInitials(nombre), color = Color.White,
+                                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                }
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Box(modifier = Modifier.size(8.dp).clip(CircleShape)
+                                            .background(SuperAccent))
+                                        Text("SUPERADMIN", color = SuperAccent,
+                                            fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                                            letterSpacing = 2.sp)
+                                    }
+                                    Text(nombre, color = colores.texto,
+                                        fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("Super Administrador",
+                                        color = colores.textoSub, fontSize = 13.sp)
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = onNavigateToNotificaciones) {
+                                    BadgedBox(badge = {
+                                        if (uiState.notificacionesCount > 0) {
+                                            Badge(containerColor = ColorRojo) {
+                                                Text(if (uiState.notificacionesCount > 99) "99+"
+                                                    else uiState.notificacionesCount.toString(),
+                                                    color = Color.White, fontSize = 10.sp)
+                                            }
+                                        }
+                                    }) {
+                                        Icon(Icons.Filled.Notifications, null,
+                                            tint = colores.textoSub, modifier = Modifier.size(22.dp))
+                                    }
+                                }
+                                IconButton(onClick = { TemaManager.toggleModo() }) {
+                                    Icon(
+                                        imageVector = when (TemaManager.modoOscuro.value) {
+                                            null  -> Icons.Filled.BrightnessMedium
+                                            true  -> Icons.Filled.DarkMode
+                                            false -> Icons.Filled.LightMode
+                                        },
+                                        contentDescription = "Modo",
+                                        tint = colores.textoSub,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                IconButton(onClick = onLogout) {
+                                    Icon(Icons.AutoMirrored.Filled.Logout, null,
+                                        tint = colores.textoSub, modifier = Modifier.size(22.dp))
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        } else {
-            // Stats 2x2
-            item {
-                Column(modifier = Modifier.padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SuperStatCard(uiState.usuarios.size.toString(),
-                            "Usuarios", SuperAccent, colores, Modifier.weight(1f))
-                        SuperStatCard(uiState.todasLasCitas.size.toString(),
-                            "Citas totales", ColorAzulClaro, colores, Modifier.weight(1f))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SuperStatCard(uiState.barberos.size.toString(),
-                            "Barberos", ColorVerde, colores, Modifier.weight(1f))
-                        SuperStatCard(uiState.servicios.size.toString(),
-                            "Servicios", ColorRojo, colores, Modifier.weight(1f))
-                    }
-                }
-                Spacer(modifier = Modifier.height(20.dp))
-            }
 
-            // Gestión del sistema
-            item {
-                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                    SuperSeccionTitulo("Gestión del sistema", colores)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SuperAccionCard(Icons.Filled.ManageAccounts,
-                            "Usuarios", "Crear · editar · eliminar · roles",
-                            SuperAccent, colores)
-                        SuperAccionCard(Icons.Filled.People,
-                            "Barberos", "${uiState.barberos.size} registrados · " +
-                                    "${uiState.barberos.count { it.activo == true }} activos",
-                            ColorVerde, colores)
-                        SuperAccionCard(Icons.Filled.ContentCut,
-                            "Servicios", "${uiState.servicios.size} servicios activos",
-                            ColorAzulClaro, colores)
-                        SuperAccionCard(Icons.Filled.Shield,
-                            "Roles disponibles",
-                            "SUPERADMIN · ADMINISTRADOR · BARBERO · CLIENTE",
-                            ColorRojo, colores)
+            item { Spacer(modifier = Modifier.height(20.dp)) }
+
+            if (uiState.isLoading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp),
+                        contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = SuperAccent,
+                            strokeWidth = 2.5.dp, modifier = Modifier.size(36.dp))
                     }
                 }
-                Spacer(modifier = Modifier.height(20.dp))
+            } else {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SuperStatCard(
+                                numero = uiState.usuarios.size.toString(),
+                                label  = "Usuarios",
+                                color  = SuperAccent,
+                                colores = colores,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onNavigateToTab(1) }
+                            )
+                            SuperStatCard(
+                                numero = uiState.todasLasCitas.size.toString(),
+                                label  = "Citas totales",
+                                color  = ColorAzulClaro,
+                                colores = colores,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onNavigateToTab(4) }
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SuperStatCard(
+                                numero = uiState.barberos.size.toString(),
+                                label  = "Barberos",
+                                color  = ColorVerde,
+                                colores = colores,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onNavigateToTab(2) }
+                            )
+                            SuperStatCard(
+                                numero = uiState.servicios.size.toString(),
+                                label  = "Servicios",
+                                color  = ColorRojo,
+                                colores = colores,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onNavigateToTab(3) }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                        SuperSeccionTitulo("Gestión del sistema", colores)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SuperAccionCard(Icons.Filled.ManageAccounts,
+                                "Usuarios", "Crear · editar · eliminar · roles",
+                                SuperAccent, colores,
+                                onClick = { onNavigateToTab(1) })
+                            SuperAccionCard(Icons.Filled.People,
+                                "Barberos", "${uiState.barberos.size} registrados · " +
+                                        "${uiState.barberos.count { it.activo == true }} activos",
+                                ColorVerde, colores,
+                                onClick = { onNavigateToTab(2) })
+                            SuperAccionCard(Icons.Filled.ContentCut,
+                                "Servicios", "${uiState.servicios.size} servicios activos",
+                                ColorAzulClaro, colores,
+                                onClick = { onNavigateToTab(3) })
+                            SuperAccionCard(Icons.Filled.Shield,
+                                "Roles disponibles",
+                                "SUPERADMIN · ADMINISTRADOR · BARBERO · CLIENTE",
+                                ColorRojo, colores,
+                                onClick = { onNavigateToTab(1) })
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
             }
         }
     }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 2 — USUARIOS (exclusivo SuperAdmin)
+// TAB 1 — USUARIOS
 // ══════════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SuperUsuariosTab(
+fun SuperUsuariosTab(
     uiState: com.example.barberia.viewmodel.SuperAdminUiState,
     viewModel: SuperAdminViewModel,
     colores: BarberiaColores
@@ -320,160 +359,177 @@ private fun SuperUsuariosTab(
     var passwordUsuario   by remember { mutableStateOf("") }
     var rolSeleccionado   by remember { mutableStateOf(RolEnum.CLIENTE) }
     var usuarioAEliminar  by remember { mutableStateOf<UsuarioDTO?>(null) }
+    var usuarioAEditar    by remember { mutableStateOf<UsuarioDTO?>(null) }
+    var editNombre        by remember { mutableStateOf("") }
+    var editTelefono      by remember { mutableStateOf("") }
+    var editRol           by remember { mutableStateOf(RolEnum.CLIENTE) }
+    var editActivo        by remember { mutableStateOf(true) }
     var filtroRol         by remember { mutableStateOf<RolEnum?>(null) }
+    var isRefreshing      by remember { mutableStateOf(false) }
 
     val usuariosFiltrados = if (filtroRol == null) uiState.usuarios
     else uiState.usuarios.filter { it.rol == filtroRol }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.cargarDatosIniciales()
+            isRefreshing = false
+        }
     ) {
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text("Usuarios", color = colores.texto,
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text("${uiState.usuarios.size} usuarios registrados",
-                        color = colores.textoSub, fontSize = 13.sp)
-                }
-                FloatingActionButton(
-                    onClick = { mostrarFormulario = !mostrarFormulario },
-                    containerColor = SuperAccent,
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
-                        null, tint = Color.White, modifier = Modifier.size(20.dp))
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(colores.fondo)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text("Usuarios", color = colores.texto,
+                            fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text("${uiState.usuarios.size} usuarios registrados",
+                            color = colores.textoSub, fontSize = 13.sp)
+                    }
+                    FloatingActionButton(
+                        onClick = { mostrarFormulario = !mostrarFormulario },
+                        containerColor = SuperAccent,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
+                            null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
-        }
 
-        // Formulario nuevo usuario
-        item {
-            AnimatedVisibility(mostrarFormulario,
-                enter = expandVertically() + fadeIn(),
-                exit  = shrinkVertically() + fadeOut()) {
-                Card(modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = colores.superficie),
-                    elevation = CardDefaults.cardElevation(
-                        defaultElevation = colores.sombra.dp)) {
-                    Column {
-                        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                            Brush.horizontalGradient(
-                                listOf(SuperAccent, SuperAccent.copy(0.3f)))))
-                        Column(modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Nuevo usuario", color = colores.texto,
-                                fontWeight = FontWeight.Bold, fontSize = 15.sp)
-
-                            BarberiaTextField(nombreUsuario,
-                                { nombreUsuario = it }, "Nombre *",
-                                Icons.Filled.Person, SuperAccent, colores)
-                            BarberiaTextField(correoUsuario,
-                                { correoUsuario = it }, "Correo *",
-                                Icons.Filled.Email, SuperAccent, colores,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Email))
-                            BarberiaTextField(passwordUsuario,
-                                { passwordUsuario = it }, "Contraseña *",
-                                Icons.Filled.Lock, SuperAccent, colores,
-                                isPassword = true)
-
-                            // Selector de rol
-                            Text("Rol", color = colores.textoSub,
-                                fontSize = 12.sp, letterSpacing = 0.5.sp)
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(RolEnum.entries.toTypedArray()) { rol ->
-                                    val seleccionado = rolSeleccionado == rol
-                                    Box(modifier = Modifier
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .background(
-                                            if (seleccionado) SuperAccent
-                                            else colores.superficie2)
-                                        .border(1.dp,
-                                            if (seleccionado) SuperAccent else colores.borde,
-                                            RoundedCornerShape(20.dp))
-                                        .clickable { rolSeleccionado = rol }
-                                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                                    ) {
-                                        Text(rol.name,
-                                            color = if (seleccionado) Color.White
-                                            else colores.textoSub,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (seleccionado)
-                                                FontWeight.Bold else FontWeight.Normal)
+            item {
+                Box {
+                    AnimatedVisibility(mostrarFormulario,
+                        enter = expandVertically() + fadeIn(),
+                        exit  = shrinkVertically() + fadeOut()) {
+                        Card(modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = colores.superficie),
+                            elevation = CardDefaults.cardElevation(
+                                defaultElevation = colores.sombra.dp)) {
+                            Column {
+                                Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+                                    Brush.horizontalGradient(listOf(SuperAccent, SuperAccent.copy(0.3f)))))
+                                Column(modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text("Nuevo usuario", color = colores.texto,
+                                        fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    BarberiaTextField(nombreUsuario,
+                                        { nombreUsuario = it }, "Nombre *",
+                                        Icons.Filled.Person, SuperAccent, colores)
+                                    BarberiaTextField(correoUsuario,
+                                        { correoUsuario = it }, "Correo *",
+                                        Icons.Filled.Email, SuperAccent, colores,
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Email))
+                                    BarberiaTextField(passwordUsuario,
+                                        { passwordUsuario = it }, "Contraseña *",
+                                        Icons.Filled.Lock, SuperAccent, colores,
+                                        isPassword = true)
+                                    Text("Rol", color = colores.textoSub,
+                                        fontSize = 12.sp, letterSpacing = 0.5.sp)
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        items(RolEnum.entries.toTypedArray()) { rol ->
+                                            val seleccionado = rolSeleccionado == rol
+                                            Box(modifier = Modifier
+                                                .width(110.dp)
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(
+                                                    if (seleccionado) SuperAccent
+                                                    else colores.superficie2)
+                                                .border(1.dp,
+                                                    if (seleccionado) SuperAccent else colores.borde,
+                                                    RoundedCornerShape(20.dp))
+                                                .clickable { rolSeleccionado = rol }
+                                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                                            ) {
+                                                Text(rol.name,
+                                                    color = if (seleccionado) Color.White
+                                                    else colores.textoSub,
+                                                    fontSize = 12.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    fontWeight = if (seleccionado)
+                                                        FontWeight.Bold else FontWeight.Normal)
+                                            }
+                                        }
                                     }
+                                    val formListo = nombreUsuario.isNotBlank() &&
+                                            correoUsuario.isNotBlank() &&
+                                            passwordUsuario.length >= 6
+                                    BarberiaBoton(
+                                        texto      = "Crear usuario",
+                                        icono      = Icons.Filled.PersonAdd,
+                                        isLoading  = uiState.isLoading,
+                                        colorFondo = if (formListo) SuperAccent else colores.borde,
+                                        onClick    = {
+                                            if (formListo) {
+                                                viewModel.crearUsuario(
+                                                    nombreUsuario, correoUsuario,
+                                                    passwordUsuario, rolSeleccionado)
+                                                nombreUsuario = ""; correoUsuario = ""
+                                                passwordUsuario = ""
+                                                rolSeleccionado = RolEnum.CLIENTE
+                                                mostrarFormulario = false
+                                            }
+                                        }
+                                    )
                                 }
                             }
-
-                            val formListo = nombreUsuario.isNotBlank() &&
-                                    correoUsuario.isNotBlank() &&
-                                    passwordUsuario.length >= 6
-
-                            BarberiaBoton(
-                                texto      = "Crear usuario",
-                                icono      = Icons.Filled.PersonAdd,
-                                isLoading  = uiState.isLoading,
-                                colorFondo = if (formListo) SuperAccent else colores.borde,
-                                onClick    = {
-                                    if (formListo) {
-                                        viewModel.crearUsuario(
-                                            nombreUsuario, correoUsuario,
-                                            passwordUsuario, rolSeleccionado)
-                                        nombreUsuario = ""; correoUsuario = ""
-                                        passwordUsuario = ""
-                                        rolSeleccionado = RolEnum.CLIENTE
-                                        mostrarFormulario = false
-                                    }
-                                }
-                            )
                         }
                     }
                 }
             }
-        }
 
-        // Filtros por rol
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item {
-                    SuperFiltroChip("Todos", filtroRol == null, colores) {
-                        filtroRol = null }
-                }
-                items(RolEnum.entries.toTypedArray()) { rol ->
-                    SuperFiltroChip(rol.name, filtroRol == rol, colores) {
-                        filtroRol = rol }
-                }
-            }
-        }
-
-        // Lista de usuarios
-        if (usuariosFiltrados.isEmpty()) {
             item {
-                Box(modifier = Modifier.fillMaxWidth().height(150.dp),
-                    contentAlignment = Alignment.Center) {
-                    Text("Sin usuarios", color = colores.textoSub, fontSize = 14.sp)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        SuperFiltroChip("Todos", filtroRol == null, colores) {
+                            filtroRol = null }
+                    }
+                    items(RolEnum.entries.toTypedArray()) { rol ->
+                        SuperFiltroChip(rol.name, filtroRol == rol, colores) {
+                            filtroRol = rol }
+                    }
                 }
             }
-        } else {
-            items(usuariosFiltrados) { usuario ->
-                TarjetaUsuarioSuper(
-                    usuario    = usuario,
-                    colores    = colores,
-                    onToggle   = { viewModel.toggleActivoUsuario(usuario) },
-                    onEliminar = { usuarioAEliminar = usuario }
-                )
+
+            if (usuariosFiltrados.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().height(150.dp),
+                        contentAlignment = Alignment.Center) {
+                        Text("Sin usuarios", color = colores.textoSub, fontSize = 14.sp)
+                    }
+                }
+            } else {
+                items(usuariosFiltrados) { usuario ->
+                    TarjetaUsuarioSuper(
+                        usuario   = usuario,
+                        colores   = colores,
+                        onToggle  = { viewModel.toggleActivoUsuario(usuario) },
+                        onEditar  = {
+                            usuarioAEditar = usuario
+                            editNombre = usuario.nombre ?: ""
+                            editTelefono = usuario.telefono ?: ""
+                            editRol = usuario.rol ?: RolEnum.CLIENTE
+                            editActivo = usuario.activo ?: true
+                        },
+                        onEliminar = { usuarioAEliminar = usuario }
+                    )
+                }
             }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
-        item { Spacer(modifier = Modifier.height(20.dp)) }
     }
 
-    // Dialog eliminar usuario
     usuarioAEliminar?.let { usuario ->
         AlertDialog(
             onDismissRequest = { usuarioAEliminar = null },
@@ -496,13 +552,91 @@ private fun SuperUsuariosTab(
             }
         )
     }
+
+    usuarioAEditar?.let { usuario ->
+        var errorMsg by remember(usuario.idUsuario) { mutableStateOf<String?>(null) }
+        AlertDialog(
+            onDismissRequest = { usuarioAEditar = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = { Text("Editar usuario", color = colores.texto,
+                fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BarberiaTextField(editNombre, { editNombre = it },
+                        "Nombre", Icons.Filled.Person, SuperAccent, colores)
+                    BarberiaTextField(editTelefono, { editTelefono = it },
+                        "Teléfono", Icons.Filled.Phone, SuperAccent, colores,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
+                    Text("Rol", color = colores.textoSub, fontSize = 12.sp)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(RolEnum.entries.toTypedArray()) { rol ->
+                            val seleccionado = editRol == rol
+                            Box(modifier = Modifier
+                                .width(110.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (seleccionado) SuperAccent else colores.superficie2)
+                                .border(1.dp, if (seleccionado) SuperAccent else colores.borde,
+                                    RoundedCornerShape(20.dp))
+                                .clickable { editRol = rol }
+                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Text(rol.name,
+                                    color = if (seleccionado) Color.White else colores.textoSub,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Normal)
+                            }
+                        }
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text("Activo", color = colores.texto, fontSize = 14.sp)
+                        Switch(checked = editActivo,
+                            onCheckedChange = { editActivo = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = SuperAccent,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = colores.borde))
+                    }
+                    errorMsg?.let {
+                        Text(it, color = ColorError, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                BarberiaBoton("Guardar", onClick = {
+                    if (editNombre.isNotBlank()) {
+                        viewModel.editarUsuario(
+                            usuario.idUsuario!!, editNombre,
+                            editTelefono.ifBlank { null }, editRol, editActivo
+                        )
+                        usuarioAEditar = null
+                    }
+                })
+            },
+            dismissButton = {
+                TextButton(onClick = { usuarioAEditar = null }) {
+                    Text("Cancelar", color = colores.textoSub) }
+            }
+        )
+        LaunchedEffect(uiState.errorMessage) {
+            if (uiState.errorMessage == "Este correo o teléfono ya está en uso") {
+                errorMsg = uiState.errorMessage
+            }
+        }
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 3 — BARBEROS
+// TAB 2 — BARBEROS
 // ══════════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SuperBarberosTab(
+fun SuperBarberosTab(
     uiState: com.example.barberia.viewmodel.SuperAdminUiState,
     viewModel: SuperAdminViewModel,
     colores: BarberiaColores
@@ -512,130 +646,153 @@ private fun SuperBarberosTab(
     var especialidad       by remember { mutableStateOf("") }
     var telefono           by remember { mutableStateOf("") }
     var barberoAEliminar   by remember { mutableStateOf<BarberoDTO?>(null) }
+    var barberoAEditar     by remember { mutableStateOf<BarberoDTO?>(null) }
+    var editNombre         by remember { mutableStateOf("") }
+    var editEspecialidad   by remember { mutableStateOf("") }
+    var editTelefono       by remember { mutableStateOf("") }
+    var editIdUsuario      by remember { mutableStateOf<Long?>(null) }
     var usuarioVinculado   by remember { mutableStateOf<Long?>(null) }
+    var isRefreshing       by remember { mutableStateOf(false) }
     val usuariosBarbero = uiState.usuarios.filter {
         it.rol == RolEnum.BARBERO && it.activo == true
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.cargarDatosIniciales()
+            isRefreshing = false
+        }
     ) {
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text("Barberos", color = colores.texto,
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text("${uiState.barberos.size} registrados",
-                        color = colores.textoSub, fontSize = 13.sp)
-                }
-                FloatingActionButton(onClick = { mostrarFormulario = !mostrarFormulario },
-                    containerColor = SuperAccent, modifier = Modifier.size(44.dp)) {
-                    Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
-                        null, tint = Color.White, modifier = Modifier.size(20.dp))
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(colores.fondo)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text("Barberos", color = colores.texto,
+                            fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text("${uiState.barberos.size} registrados",
+                            color = colores.textoSub, fontSize = 13.sp)
+                    }
+                    FloatingActionButton(onClick = { mostrarFormulario = !mostrarFormulario },
+                        containerColor = SuperAccent, modifier = Modifier.size(44.dp)) {
+                        Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
+                            null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
-        }
 
-        item {
-            AnimatedVisibility(mostrarFormulario,
-                enter = expandVertically() + fadeIn(),
-                exit  = shrinkVertically() + fadeOut()) {
-                Card(modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = colores.superficie),
-                    elevation = CardDefaults.cardElevation(
-                        defaultElevation = colores.sombra.dp)) {
-                    Column {
-                        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                            Brush.horizontalGradient(
-                                listOf(SuperAccent, ColorVerde))))
-                        Column(modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Nuevo barbero", color = colores.texto,
-                                fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            BarberiaTextField(nombreBarbero,
-                                { nombreBarbero = it }, "Nombre *",
-                                Icons.Filled.Person, SuperAccent, colores)
-                            BarberiaTextField(especialidad,
-                                { especialidad = it }, "Especialidad",
-                                Icons.Filled.ContentCut, SuperAccent, colores)
-                            BarberiaTextField(telefono,
-                                { telefono = it }, "Teléfono",
-                                Icons.Filled.Phone, SuperAccent, colores,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Phone))
+            item {
+                Box {
+                    AnimatedVisibility(mostrarFormulario,
+                        enter = expandVertically() + fadeIn(),
+                        exit  = shrinkVertically() + fadeOut()) {
+                        Card(modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = colores.superficie),
+                            elevation = CardDefaults.cardElevation(
+                                defaultElevation = colores.sombra.dp)) {
+                            Column {
+                                Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+                                    Brush.horizontalGradient(listOf(SuperAccent, ColorVerde))))
+                                Column(modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text("Nuevo barbero", color = colores.texto,
+                                        fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    BarberiaTextField(nombreBarbero,
+                                        { nombreBarbero = it }, "Nombre *",
+                                        Icons.Filled.Person, SuperAccent, colores)
+                                    BarberiaTextField(especialidad,
+                                        { especialidad = it }, "Especialidad",
+                                        Icons.Filled.ContentCut, SuperAccent, colores)
+                                    BarberiaTextField(telefono,
+                                        { telefono = it }, "Teléfono",
+                                        Icons.Filled.Phone, SuperAccent, colores,
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Phone))
 
-                            if (usuariosBarbero.isNotEmpty()) {
-                                Text("Vincular con usuario BARBERO",
-                                    color = colores.textoSub, fontSize = 12.sp)
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    item {
-                                        Box(modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (usuarioVinculado == null)
-                                                SuperAccent else colores.superficie2)
-                                            .border(1.dp, if (usuarioVinculado == null)
-                                                SuperAccent else colores.borde,
-                                                RoundedCornerShape(8.dp))
-                                            .clickable { usuarioVinculado = null }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)) {
-                                            Text("Sin vínculo",
-                                                color = if (usuarioVinculado == null)
-                                                    Color.White else colores.texto,
-                                                fontSize = 11.sp)
+                                    if (usuariosBarbero.isNotEmpty()) {
+                                        Text("Vincular con usuario BARBERO",
+                                            color = colores.textoSub, fontSize = 12.sp)
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            item {
+                                                Box(modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(if (usuarioVinculado == null)
+                                                        SuperAccent else colores.superficie2)
+                                                    .border(1.dp, if (usuarioVinculado == null)
+                                                        SuperAccent else colores.borde,
+                                                        RoundedCornerShape(8.dp))
+                                                    .clickable { usuarioVinculado = null }
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                                    Text("Sin vínculo",
+                                                        color = if (usuarioVinculado == null)
+                                                            Color.White else colores.texto,
+                                                        fontSize = 11.sp)
+                                                }
+                                            }
+                                            items(usuariosBarbero) { user ->
+                                                val sel = usuarioVinculado == user.idUsuario
+                                                Box(modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(if (sel) SuperAccent else colores.superficie2)
+                                                    .border(1.dp, if (sel) SuperAccent else colores.borde,
+                                                        RoundedCornerShape(8.dp))
+                                                    .clickable { usuarioVinculado = user.idUsuario }
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                                    Text(user.nombre?.take(15) ?: "User #${user.idUsuario}",
+                                                        color = if (sel) Color.White else colores.texto,
+                                                        fontSize = 11.sp)
+                                                }
+                                            }
                                         }
                                     }
-                                    items(usuariosBarbero) { user ->
-                                        val sel = usuarioVinculado == user.idUsuario
-                                        Box(modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (sel) SuperAccent else colores.superficie2)
-                                            .border(1.dp, if (sel) SuperAccent else colores.borde,
-                                                RoundedCornerShape(8.dp))
-                                            .clickable { usuarioVinculado = user.idUsuario }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)) {
-                                            Text(user.nombre?.take(15) ?: "User #${user.idUsuario}",
-                                                color = if (sel) Color.White else colores.texto,
-                                                fontSize = 11.sp)
+
+                                    BarberiaBoton(
+                                        texto      = "Crear barbero",
+                                        icono      = Icons.Filled.PersonAdd,
+                                        isLoading  = uiState.isLoading,
+                                        colorFondo = if (nombreBarbero.isNotBlank())
+                                            SuperAccent else colores.borde,
+                                        onClick    = {
+                                            if (nombreBarbero.isNotBlank()) {
+                                                viewModel.crearBarbero(
+                                                    nombreBarbero, especialidad, telefono,
+                                                    usuarioVinculado)
+                                                nombreBarbero = ""; especialidad = ""
+                                                telefono = ""; usuarioVinculado = null
+                                                mostrarFormulario = false
+                                            }
                                         }
-                                    }
+                                    )
                                 }
                             }
-
-                            BarberiaBoton(
-                                texto      = "Crear barbero",
-                                icono      = Icons.Filled.PersonAdd,
-                                isLoading  = uiState.isLoading,
-                                colorFondo = if (nombreBarbero.isNotBlank())
-                                    SuperAccent else colores.borde,
-                                onClick    = {
-                                    if (nombreBarbero.isNotBlank()) {
-                                        viewModel.crearBarbero(
-                                            nombreBarbero, especialidad, telefono,
-                                            usuarioVinculado)
-                                        nombreBarbero = ""; especialidad = ""
-                                        telefono = ""; usuarioVinculado = null
-                                        mostrarFormulario = false
-                                    }
-                                }
-                            )
                         }
                     }
                 }
             }
-        }
 
-        items(uiState.barberos) { barbero ->
-            TarjetaBarberoSuper(barbero, colores,
-                onToggle   = { viewModel.toggleActivoBarbero(barbero) },
-                onEliminar = { barberoAEliminar = barbero })
+            items(uiState.barberos) { barbero ->
+                TarjetaBarberoSuper(barbero, colores,
+                    onToggle   = { viewModel.toggleActivoBarbero(barbero) },
+                    onEditar   = {
+                        barberoAEditar = barbero
+                        editNombre = barbero.nombre
+                        editEspecialidad = barbero.especialidad ?: ""
+                        editTelefono = barbero.telefono ?: ""
+                        editIdUsuario = barbero.idUsuario
+                    },
+                    onEliminar = { barberoAEliminar = barbero })
+            }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
-        item { Spacer(modifier = Modifier.height(20.dp)) }
     }
 
     barberoAEliminar?.let { barbero ->
@@ -645,7 +802,7 @@ private fun SuperBarberosTab(
             shape            = RoundedCornerShape(20.dp),
             title = { Text("Eliminar barbero", color = colores.texto,
                 fontWeight = FontWeight.Bold) },
-            text  = { Text("¿Eliminar a ${barbero.nombre}?",
+            text  = { Text("¿Eliminar a ${barbero.nombre}? Las citas pendientes serán canceladas y los clientes notificados.",
                 color = colores.textoSub, fontSize = 14.sp) },
             confirmButton = {
                 BarberiaBoton("Eliminar", colorFondo = ColorError, onClick = {
@@ -659,110 +816,285 @@ private fun SuperBarberosTab(
             }
         )
     }
+
+    barberoAEditar?.let { barbero ->
+        var errorMsg by remember(barbero.idBarbero) { mutableStateOf<String?>(null) }
+        AlertDialog(
+            onDismissRequest = { barberoAEditar = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = { Text("Editar barbero", color = colores.texto,
+                fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BarberiaTextField(editNombre, { editNombre = it },
+                        "Nombre *", Icons.Filled.Person, SuperAccent, colores)
+                    BarberiaTextField(editEspecialidad, { editEspecialidad = it },
+                        "Especialidad", Icons.Filled.ContentCut, SuperAccent, colores)
+                    BarberiaTextField(editTelefono, { editTelefono = it },
+                        "Teléfono", Icons.Filled.Phone, SuperAccent, colores,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
+                    if (usuariosBarbero.isNotEmpty()) {
+                        Text("Usuario vinculado", color = colores.textoSub, fontSize = 12.sp)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            item {
+                                Box(modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (editIdUsuario == null)
+                                        SuperAccent else colores.superficie2)
+                                    .border(1.dp, if (editIdUsuario == null)
+                                        SuperAccent else colores.borde,
+                                        RoundedCornerShape(8.dp))
+                                    .clickable { editIdUsuario = null }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                    Text("Sin vínculo",
+                                        color = if (editIdUsuario == null)
+                                            Color.White else colores.texto,
+                                        fontSize = 11.sp)
+                                }
+                            }
+                            items(usuariosBarbero) { user ->
+                                val sel = editIdUsuario == user.idUsuario
+                                Box(modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (sel) SuperAccent else colores.superficie2)
+                                    .border(1.dp, if (sel) SuperAccent else colores.borde,
+                                        RoundedCornerShape(8.dp))
+                                    .clickable { editIdUsuario = user.idUsuario }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                    Text(user.nombre?.take(15) ?: "User #${user.idUsuario}",
+                                        color = if (sel) Color.White else colores.texto,
+                                        fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                    errorMsg?.let {
+                        Text(it, color = ColorError, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                BarberiaBoton("Guardar", onClick = {
+                    if (editNombre.isNotBlank()) {
+                        viewModel.editarBarbero(
+                            barbero.idBarbero!!, editNombre,
+                            editEspecialidad, editTelefono, editIdUsuario
+                        )
+                        barberoAEditar = null
+                    }
+                })
+            },
+            dismissButton = {
+                TextButton(onClick = { barberoAEditar = null }) {
+                    Text("Cancelar", color = colores.textoSub) }
+            }
+        )
+        LaunchedEffect(uiState.errorMessage) {
+            if (uiState.errorMessage == "Este teléfono ya está registrado, usa otro") {
+                errorMsg = uiState.errorMessage
+            }
+        }
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 4 — SERVICIOS
+// TAB 3 — SERVICIOS
 // ══════════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SuperServiciosTab(
+fun SuperServiciosTab(
     uiState: com.example.barberia.viewmodel.SuperAdminUiState,
     viewModel: SuperAdminViewModel,
     colores: BarberiaColores
 ) {
-    var mostrarFormulario by remember { mutableStateOf(false) }
-    var nombreServicio    by remember { mutableStateOf("") }
-    var descripcion       by remember { mutableStateOf("") }
-    var precio            by remember { mutableStateOf("") }
-    var duracion          by remember { mutableStateOf("") }
-    var servicioAEliminar by remember { mutableStateOf<ServicioDTO?>(null) }
+    var mostrarFormulario  by remember { mutableStateOf(false) }
+    var nombreServicio     by remember { mutableStateOf("") }
+    var descripcion        by remember { mutableStateOf("") }
+    var precio             by remember { mutableStateOf("") }
+    var duracion           by remember { mutableStateOf("") }
+    var servicioAEliminar  by remember { mutableStateOf<ServicioDTO?>(null) }
+    var servicioAEditar    by remember { mutableStateOf<ServicioDTO?>(null) }
+    var servicioDetalle    by remember { mutableStateOf<ServicioConDetalle?>(null) }
+    var editNombre         by remember { mutableStateOf("") }
+    var editDesc           by remember { mutableStateOf("") }
+    var editPrecio         by remember { mutableStateOf("") }
+    var editDuracion       by remember { mutableStateOf("") }
+    var filtroServicio     by remember { mutableStateOf(0) }
+    var isRefreshing       by remember { mutableStateOf(false) }
+    val serviciosFiltrados = when (filtroServicio) {
+        1 -> uiState.serviciosConDetalle
+            .filter { it.barberoDTOs.isNotEmpty() || it.clienteDTOs.isNotEmpty() }
+            .sortedByDescending { it.barberoDTOs.size + it.clienteDTOs.size }
+            .map { it.servicio }
+        2 -> uiState.servicios.sortedBy { it.precio }
+        3 -> uiState.servicios.sortedByDescending { it.precio }
+        else -> uiState.servicios
+    }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.cargarDatosIniciales()
+            isRefreshing = false
+        }
     ) {
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text("Servicios", color = colores.texto,
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text("${uiState.servicios.size} servicios",
-                        color = colores.textoSub, fontSize = 13.sp)
-                }
-                FloatingActionButton(onClick = { mostrarFormulario = !mostrarFormulario },
-                    containerColor = SuperAccent, modifier = Modifier.size(44.dp)) {
-                    Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
-                        null, tint = Color.White, modifier = Modifier.size(20.dp))
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(colores.fondo)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text("Servicios", color = colores.texto,
+                            fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text("${uiState.servicios.size} servicios",
+                            color = colores.textoSub, fontSize = 13.sp)
+                    }
+                    FloatingActionButton(onClick = { mostrarFormulario = !mostrarFormulario },
+                        containerColor = SuperAccent, modifier = Modifier.size(44.dp)) {
+                        Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
+                            null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
-        }
 
-        item {
-            AnimatedVisibility(mostrarFormulario,
-                enter = expandVertically() + fadeIn(),
-                exit  = shrinkVertically() + fadeOut()) {
-                Card(modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = colores.superficie),
-                    elevation = CardDefaults.cardElevation(
-                        defaultElevation = colores.sombra.dp)) {
-                    Column {
-                        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                            Brush.horizontalGradient(listOf(SuperAccent, ColorRojo))))
-                        Column(modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Nuevo servicio", color = colores.texto,
-                                fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            BarberiaTextField(nombreServicio,
-                                { nombreServicio = it }, "Nombre *",
-                                Icons.Filled.ContentCut, SuperAccent, colores)
-                            BarberiaTextField(descripcion,
-                                { descripcion = it }, "Descripción",
-                                Icons.Filled.Description, SuperAccent, colores)
-                            BarberiaTextField(precio,
-                                { precio = it }, "Precio",
-                                Icons.Filled.AttachMoney, SuperAccent, colores,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number))
-                            BarberiaTextField(duracion,
-                                { duracion = it }, "Duración (minutos)",
-                                Icons.Filled.Schedule, SuperAccent, colores,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number))
-                            val formListo = nombreServicio.isNotBlank() &&
-                                    precio.toDoubleOrNull() != null &&
-                                    duracion.toIntOrNull() != null
-                            BarberiaBoton(
-                                texto      = "Crear servicio",
-                                icono      = Icons.Filled.Add,
-                                isLoading  = uiState.isLoading,
-                                colorFondo = if (formListo) SuperAccent else colores.borde,
-                                onClick    = {
-                                    if (formListo) {
-                                        viewModel.crearServicio(
-                                            nombreServicio, descripcion,
-                                            precio.toDouble(), duracion.toInt())
-                                        nombreServicio = ""; descripcion = ""
-                                        precio = ""; duracion = ""
-                                        mostrarFormulario = false
-                                    }
-                                }
-                            )
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(listOf(
+                        0 to "Todos", 1 to "Más populares",
+                        2 to "Precio bajo→alto", 3 to "Precio alto→bajo",
+                        4 to "Por tipo"
+                    )) { (idx, label) ->
+                        SuperFiltroChip(label, filtroServicio == idx, colores) {
+                            filtroServicio = idx
                         }
                     }
                 }
             }
-        }
 
-        items(uiState.servicios) { servicio ->
-            TarjetaServicioSuper(servicio, colores) {
-                servicioAEliminar = servicio }
+            item {
+                Box {
+                    AnimatedVisibility(mostrarFormulario,
+                        enter = expandVertically() + fadeIn(),
+                        exit  = shrinkVertically() + fadeOut()) {
+                        Card(modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = colores.superficie),
+                            elevation = CardDefaults.cardElevation(
+                                defaultElevation = colores.sombra.dp)) {
+                            Column {
+                                Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+                                    Brush.horizontalGradient(listOf(SuperAccent, ColorRojo))))
+                                Column(modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text("Nuevo servicio", color = colores.texto,
+                                        fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    BarberiaTextField(nombreServicio,
+                                        { nombreServicio = it }, "Nombre *",
+                                        Icons.Filled.ContentCut, SuperAccent, colores)
+                                    BarberiaTextField(descripcion,
+                                        { descripcion = it }, "Descripción",
+                                        Icons.Filled.Description, SuperAccent, colores)
+                                    BarberiaTextField(precio,
+                                        { precio = it }, "Precio",
+                                        Icons.Filled.AttachMoney, SuperAccent, colores,
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Number))
+                                    BarberiaTextField(duracion,
+                                        { duracion = it }, "Duración (minutos)",
+                                        Icons.Filled.Schedule, SuperAccent, colores,
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Number))
+                                    val formListo = nombreServicio.isNotBlank() &&
+                                            precio.toDoubleOrNull() != null &&
+                                            duracion.toIntOrNull() != null
+                                    BarberiaBoton(
+                                        texto      = "Crear servicio",
+                                        icono      = Icons.Filled.Add,
+                                        isLoading  = uiState.isLoading,
+                                        colorFondo = if (formListo) SuperAccent else colores.borde,
+                                        onClick    = {
+                                            if (formListo) {
+                                                viewModel.crearServicio(
+                                                    nombreServicio, descripcion,
+                                                    precio.toDouble(), duracion.toInt())
+                                                nombreServicio = ""; descripcion = ""
+                                                precio = ""; duracion = ""
+                                                mostrarFormulario = false
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            items(serviciosFiltrados) { servicio ->
+                TarjetaServicioSuper(
+                    servicio  = servicio,
+                    colores   = colores,
+                    onDetalle = {
+                        val det = uiState.serviciosConDetalle.find {
+                            it.servicio.idServicio == servicio.idServicio
+                        }
+                        servicioDetalle = det ?: ServicioConDetalle(servicio = servicio)
+                    },
+                    onEditar  = {
+                        servicioAEditar = servicio
+                        editNombre = servicio.nombre
+                        editDesc = servicio.descripcion ?: ""
+                        editPrecio = servicio.precio.toInt().toString()
+                        editDuracion = servicio.duracionMinutos.toString()
+                    },
+                    onEliminar = { servicioAEliminar = servicio }
+                )
+            }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
-        item { Spacer(modifier = Modifier.height(20.dp)) }
+    }
+
+    servicioDetalle?.let { det ->
+        AlertDialog(
+            onDismissRequest = { servicioDetalle = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = { Text(det.servicio.nombre, color = colores.texto,
+                fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (det.barberoDTOs.isNotEmpty()) {
+                        Text("Barberos asociados:", color = colores.texto,
+                            fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        det.barberoDTOs.forEach { b ->
+                            Text("• ${b.nombre}", color = colores.textoSub, fontSize = 12.sp)
+                        }
+                    }
+                    if (det.clienteDTOs.isNotEmpty()) {
+                        Text("Clientes asociados:", color = colores.texto,
+                            fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        det.clienteDTOs.forEach { c ->
+                            Text("• ${c.nombre ?: ""}", color = colores.textoSub, fontSize = 12.sp)
+                        }
+                    }
+                    if (det.barberoDTOs.isEmpty() && det.clienteDTOs.isEmpty()) {
+                        Text("Sin datos de barberos o clientes asociados",
+                            color = colores.textoSub, fontSize = 13.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                BarberiaBoton("Cerrar", colorFondo = SuperAccent,
+                    onClick = { servicioDetalle = null })
+            }
+        )
     }
 
     servicioAEliminar?.let { servicio ->
@@ -786,92 +1118,158 @@ private fun SuperServiciosTab(
             }
         )
     }
+
+    servicioAEditar?.let { servicio ->
+        AlertDialog(
+            onDismissRequest = { servicioAEditar = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = { Text("Editar servicio", color = colores.texto,
+                fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BarberiaTextField(editNombre, { editNombre = it },
+                        "Nombre *", Icons.Filled.ContentCut, SuperAccent, colores)
+                    BarberiaTextField(editDesc, { editDesc = it },
+                        "Descripción", Icons.Filled.Description, SuperAccent, colores)
+                    BarberiaTextField(editPrecio, { editPrecio = it },
+                        "Precio", Icons.Filled.AttachMoney, SuperAccent, colores,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    BarberiaTextField(editDuracion, { editDuracion = it },
+                        "Duración (min)", Icons.Filled.Schedule, SuperAccent, colores,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }
+            },
+            confirmButton = {
+                BarberiaBoton("Guardar", onClick = {
+                    val p = editPrecio.toDoubleOrNull()
+                    val d = editDuracion.toIntOrNull()
+                    if (editNombre.isNotBlank() && p != null && d != null) {
+                        viewModel.actualizarServicio(
+                            servicio.copy(
+                                nombre = editNombre,
+                                descripcion = editDesc.ifBlank { null },
+                                precio = p,
+                                duracionMinutos = d
+                            )
+                        )
+                        servicioAEditar = null
+                    }
+                })
+            },
+            dismissButton = {
+                TextButton(onClick = { servicioAEditar = null }) {
+                    Text("Cancelar", color = colores.textoSub) }
+            }
+        )
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 5 — CITAS (todas)
+// TAB 4 — CITAS
 // ══════════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SuperCitasTab(
+fun SuperCitasTab(
     uiState: com.example.barberia.viewmodel.SuperAdminUiState,
     viewModel: SuperAdminViewModel,
     colores: BarberiaColores
 ) {
-    var citaACancelar by remember { mutableStateOf<CitaDTO?>(null) }
+    var citaACancelar by remember { mutableStateOf<CitaConDetalle?>(null) }
     var filtroEstado  by remember { mutableStateOf<EstadoCitaEnum?>(null) }
+    var isRefreshing  by remember { mutableStateOf(false) }
 
-    val citasFiltradas = if (filtroEstado == null) uiState.todasLasCitas
-    else uiState.todasLasCitas.filter { it.estado == filtroEstado }
+    val citasFiltradas = if (filtroEstado == null) uiState.citasConDetalles
+    else uiState.citasConDetalles.filter { it.cita.estado == filtroEstado }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("Todas las citas", color = colores.texto,
-                fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("${uiState.todasLasCitas.size} citas · ${uiState.citasHoy.size} hoy",
-                color = colores.textoSub, fontSize = 13.sp)
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.cargarDatosIniciales()
+            isRefreshing = false
         }
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(colores.fondo)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(20.dp))
+                Text("Todas las citas", color = colores.texto,
+                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("${uiState.todasLasCitas.size} citas · ${uiState.citasHoy.size} hoy",
+                    color = colores.textoSub, fontSize = 13.sp)
+            }
 
-        // Filtros
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item {
-                    SuperFiltroChip("Todas", filtroEstado == null, colores) {
-                        filtroEstado = null }
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        SuperFiltroChip("Todas", filtroEstado == null, colores) {
+                            filtroEstado = null }
+                    }
+                    items(EstadoCitaEnum.entries.toTypedArray()) { estado ->
+                        SuperFiltroChip(
+                            texto = when (estado) {
+                                EstadoCitaEnum.PENDIENTE     -> "Pendientes"
+                                EstadoCitaEnum.EN_CURSO      -> "En curso"
+                                EstadoCitaEnum.FINALIZADA    -> "Finalizadas"
+                                EstadoCitaEnum.CANCELADA     -> "Canceladas"
+                                EstadoCitaEnum.NO_PRESENTADO -> "No presentó"
+                            },
+                            seleccionado = filtroEstado == estado,
+                            colores      = colores,
+                            onClick      = { filtroEstado = estado }
+                        )
+                    }
                 }
-                items(EstadoCitaEnum.entries.toTypedArray()) { estado ->
-                    SuperFiltroChip(
-                        texto = when (estado) {
-                            EstadoCitaEnum.PENDIENTE     -> "Pendiente"
-                            EstadoCitaEnum.EN_CURSO      -> "En curso"
-                            EstadoCitaEnum.FINALIZADA    -> "Finalizada"
-                            EstadoCitaEnum.CANCELADA     -> "Cancelada"
-                            EstadoCitaEnum.NO_PRESENTADO -> "No presentó"
-                        },
-                        seleccionado = filtroEstado == estado,
-                        colores      = colores,
-                        onClick      = { filtroEstado = estado }
+            }
+
+            if (uiState.isLoading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().height(180.dp),
+                        contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = SuperAccent,
+                            modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
+                    }
+                }
+            } else if (citasFiltradas.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().height(180.dp),
+                        contentAlignment = Alignment.Center) {
+                        Text("Sin citas", color = colores.textoSub, fontSize = 15.sp)
+                    }
+                }
+            } else {
+                items(citasFiltradas) { detalle ->
+                    TarjetaCitaSuper(
+                        detalle  = detalle,
+                        colores  = colores,
+                        onCancelar = {
+                            if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE ||
+                                detalle.cita.estado == EstadoCitaEnum.EN_CURSO)
+                                citaACancelar = detalle
+                        }
                     )
                 }
             }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
-
-        if (uiState.isLoading) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().height(180.dp),
-                    contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = SuperAccent,
-                        modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
-                }
-            }
-        } else {
-            items(citasFiltradas) { cita ->
-                TarjetaCitaSuper(cita, colores) {
-                    if (cita.estado == EstadoCitaEnum.PENDIENTE ||
-                        cita.estado == EstadoCitaEnum.EN_CURSO)
-                        citaACancelar = cita
-                }
-            }
-        }
-        item { Spacer(modifier = Modifier.height(20.dp)) }
     }
 
-    citaACancelar?.let { cita ->
+    citaACancelar?.let { detalle ->
         AlertDialog(
             onDismissRequest = { citaACancelar = null },
             containerColor   = colores.superficie,
             shape            = RoundedCornerShape(20.dp),
             title = { Text("Cancelar cita", color = colores.texto,
                 fontWeight = FontWeight.Bold) },
-            text  = { Text("¿Cancelar la cita #${cita.idCita}?",
+            text  = { Text("¿Cancelar la cita #${detalle.cita.idCita} con ${detalle.clienteNombre}?",
                 color = colores.textoSub, fontSize = 14.sp) },
             confirmButton = {
                 BarberiaBoton("Sí, cancelar", colorFondo = ColorError, onClick = {
-                    viewModel.cancelarCita(cita.idCita!!)
+                    viewModel.cancelarCita(detalle.cita.idCita!!)
                     citaACancelar = null
                 })
             },
@@ -888,11 +1286,14 @@ private fun SuperCitasTab(
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun SuperStatCard(
+fun SuperStatCard(
     numero: String, label: String, color: Color,
-    colores: BarberiaColores, modifier: Modifier = Modifier
+    colores: BarberiaColores, modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
 ) {
-    Card(modifier = modifier, shape = RoundedCornerShape(14.dp),
+    Card(modifier = modifier
+        .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
         Column(modifier = Modifier.padding(16.dp),
@@ -905,7 +1306,7 @@ private fun SuperStatCard(
 }
 
 @Composable
-private fun SuperSeccionTitulo(texto: String, colores: BarberiaColores) {
+fun SuperSeccionTitulo(texto: String, colores: BarberiaColores) {
     Row(verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(modifier = Modifier.width(3.dp).height(18.dp)
@@ -915,11 +1316,14 @@ private fun SuperSeccionTitulo(texto: String, colores: BarberiaColores) {
 }
 
 @Composable
-private fun SuperAccionCard(
-    icono: androidx.compose.ui.graphics.vector.ImageVector,
-    titulo: String, subtitulo: String, color: Color, colores: BarberiaColores
+fun SuperAccionCard(
+    icono: ImageVector,
+    titulo: String, subtitulo: String, color: Color, colores: BarberiaColores,
+    onClick: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+    Card(modifier = Modifier.fillMaxWidth()
+        .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
         Row(modifier = Modifier.padding(16.dp),
@@ -943,9 +1347,9 @@ private fun SuperAccionCard(
 }
 
 @Composable
-private fun TarjetaUsuarioSuper(
+fun TarjetaUsuarioSuper(
     usuario: UsuarioDTO, colores: BarberiaColores,
-    onToggle: () -> Unit, onEliminar: () -> Unit
+    onToggle: () -> Unit, onEditar: () -> Unit, onEliminar: () -> Unit
 ) {
     val colorRol = when (usuario.rol) {
         RolEnum.SUPERADMIN    -> SuperAccent
@@ -960,11 +1364,10 @@ private fun TarjetaUsuarioSuper(
         Row(modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Avatar con color del rol
             Box(modifier = Modifier.size(42.dp).clip(CircleShape)
                 .background(colorRol.copy(0.15f)),
                 contentAlignment = Alignment.Center) {
-                Text(usuario.nombre?.take(2)?.uppercase() ?: "??",
+                Text(getInitials(usuario.nombre ?: "").take(2),
                     color = colorRol, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -972,7 +1375,6 @@ private fun TarjetaUsuarioSuper(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(usuario.nombre ?: "Sin nombre", color = colores.texto,
                         fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                    // Badge del rol
                     Box(modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .background(colorRol.copy(0.15f))
@@ -991,6 +1393,10 @@ private fun TarjetaUsuarioSuper(
                     checkedTrackColor   = SuperAccent,
                     uncheckedThumbColor = Color.White,
                     uncheckedTrackColor = colores.borde))
+            IconButton(onClick = onEditar, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Filled.Edit, null,
+                    tint = SuperAccent, modifier = Modifier.size(16.dp))
+            }
             IconButton(onClick = onEliminar, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Filled.DeleteOutline, null,
                     tint = ColorError, modifier = Modifier.size(18.dp))
@@ -1000,9 +1406,9 @@ private fun TarjetaUsuarioSuper(
 }
 
 @Composable
-private fun TarjetaBarberoSuper(
+fun TarjetaBarberoSuper(
     barbero: BarberoDTO, colores: BarberiaColores,
-    onToggle: () -> Unit, onEliminar: () -> Unit
+    onToggle: () -> Unit, onEditar: () -> Unit, onEliminar: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
@@ -1014,7 +1420,7 @@ private fun TarjetaBarberoSuper(
                 .background(if (barbero.activo == true)
                     SuperAccent.copy(0.15f) else colores.borde),
                 contentAlignment = Alignment.Center) {
-                Text(barbero.nombre.take(2).uppercase(),
+                Text(getInitials(barbero.nombre).take(2),
                     color = if (barbero.activo == true) SuperAccent else colores.textoSub,
                     fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
@@ -1031,6 +1437,10 @@ private fun TarjetaBarberoSuper(
                     checkedTrackColor   = SuperAccent,
                     uncheckedThumbColor = Color.White,
                     uncheckedTrackColor = colores.borde))
+            IconButton(onClick = onEditar, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Filled.Edit, null,
+                    tint = SuperAccent, modifier = Modifier.size(16.dp))
+            }
             IconButton(onClick = onEliminar, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Filled.DeleteOutline, null,
                     tint = ColorError, modifier = Modifier.size(18.dp))
@@ -1040,10 +1450,13 @@ private fun TarjetaBarberoSuper(
 }
 
 @Composable
-private fun TarjetaServicioSuper(
-    servicio: ServicioDTO, colores: BarberiaColores, onEliminar: () -> Unit
+fun TarjetaServicioSuper(
+    servicio: ServicioDTO, colores: BarberiaColores,
+    onDetalle: () -> Unit, onEditar: () -> Unit, onEliminar: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+    Card(modifier = Modifier.fillMaxWidth()
+        .clickable { onDetalle() },
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
         Row(modifier = Modifier.padding(14.dp),
@@ -1063,6 +1476,10 @@ private fun TarjetaServicioSuper(
             }
             Text("\$${servicio.precio.toInt()}", color = SuperAccent,
                 fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            IconButton(onClick = onEditar, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Filled.Edit, null,
+                    tint = SuperAccent, modifier = Modifier.size(16.dp))
+            }
             IconButton(onClick = onEliminar, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Filled.DeleteOutline, null,
                     tint = ColorError, modifier = Modifier.size(18.dp))
@@ -1072,10 +1489,12 @@ private fun TarjetaServicioSuper(
 }
 
 @Composable
-private fun TarjetaCitaSuper(
-    cita: CitaDTO, colores: BarberiaColores, onCancelar: () -> Unit
+fun TarjetaCitaSuper(
+    detalle: CitaConDetalle,
+    colores: BarberiaColores,
+    onCancelar: () -> Unit
 ) {
-    val colorEstado = when (cita.estado) {
+    val colorEstado = when (detalle.cita.estado) {
         EstadoCitaEnum.PENDIENTE     -> ColorDorado
         EstadoCitaEnum.EN_CURSO      -> ColorAzulClaro
         EstadoCitaEnum.FINALIZADA    -> ColorVerde
@@ -1087,25 +1506,25 @@ private fun TarjetaCitaSuper(
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
         Row {
-            Box(modifier = Modifier.width(4.dp).height(72.dp).background(colorEstado))
+            Box(modifier = Modifier.width(4.dp).height(100.dp).background(colorEstado))
             Column(modifier = Modifier.weight(1f)
                 .padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically) {
                     Column {
-                        Text("Cita #${cita.idCita}", color = colores.texto,
-                            fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        Text("${cita.fecha} · ${cita.horaInicio?.take(5)}",
+                        Text(detalle.clienteNombre, color = colores.texto,
+                            fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("${detalle.cita.fecha} · ${detalle.cita.horaInicio?.take(5)}",
                             color = colores.textoSub, fontSize = 12.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Box(modifier = Modifier.clip(RoundedCornerShape(8.dp))
                             .background(colorEstado.copy(alpha = 0.15f))
                             .padding(horizontal = 8.dp, vertical = 3.dp)) {
                             Text(
-                                text = when (cita.estado) {
+                                text = when (detalle.cita.estado) {
                                     EstadoCitaEnum.PENDIENTE     -> "Pendiente"
                                     EstadoCitaEnum.EN_CURSO      -> "En curso"
                                     EstadoCitaEnum.FINALIZADA    -> "Finalizada"
@@ -1117,8 +1536,8 @@ private fun TarjetaCitaSuper(
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
-                        if (cita.estado == EstadoCitaEnum.PENDIENTE ||
-                            cita.estado == EstadoCitaEnum.EN_CURSO) {
+                        if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE ||
+                            detalle.cita.estado == EstadoCitaEnum.EN_CURSO) {
                             IconButton(onClick = onCancelar,
                                 modifier = Modifier.size(32.dp)) {
                                 Icon(Icons.Filled.Cancel, null,
@@ -1127,13 +1546,20 @@ private fun TarjetaCitaSuper(
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(detalle.barberoNombre, color = colores.textoSub, fontSize = 11.sp)
+                    Text(detalle.servicioNombre, color = colores.textoSub, fontSize = 11.sp)
+                    Text("\$${detalle.precio.toInt()}", color = SuperAccent,
+                        fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SuperFiltroChip(
+fun SuperFiltroChip(
     texto: String, seleccionado: Boolean,
     colores: BarberiaColores, onClick: () -> Unit
 ) {
@@ -1151,3 +1577,8 @@ private fun SuperFiltroChip(
             fontWeight = if (seleccionado) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
+
+
+
+
+

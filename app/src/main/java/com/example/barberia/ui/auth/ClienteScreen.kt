@@ -71,12 +71,16 @@ fun ClienteScreen(
     nombre: String,
     onLogout: () -> Unit,
     onNavigateToNotificaciones: () -> Unit = {}
-)
+) {
+    val viewModel: ClienteViewModel = viewModel(
+        factory = ClienteViewModel.factory(apiService, idUsuario)
+    )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val pagerState    = rememberPagerState(pageCount = { 3 })
     val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
+    val colores = LocalBarberiaColores.current
 
     val initials = remember(nombre) {
         val ascii = Normalizer.normalize(nombre, Normalizer.Form.NFD)
@@ -396,7 +400,22 @@ private fun AgendarTab(
         initialSelectedDateMillis = null,
         selectableDates = object : SelectableDates {
             override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                return utcTimeMillis in hoy..dentroDe8Dias
+                if (utcTimeMillis !in hoy..dentroDe8Dias) return false
+                if (barberoSeleccionado == null) return true
+                val horarios = uiState.barberoHorarios
+                if (horarios.isEmpty()) return true
+                val cal = java.util.Calendar.getInstance().apply { timeInMillis = utcTimeMillis }
+                val dayOfWeek = when (cal.get(java.util.Calendar.DAY_OF_WEEK)) {
+                    java.util.Calendar.MONDAY -> DiaSemanaEnum.LUNES
+                    java.util.Calendar.TUESDAY -> DiaSemanaEnum.MARTES
+                    java.util.Calendar.WEDNESDAY -> DiaSemanaEnum.MIERCOLES
+                    java.util.Calendar.THURSDAY -> DiaSemanaEnum.JUEVES
+                    java.util.Calendar.FRIDAY -> DiaSemanaEnum.VIERNES
+                    java.util.Calendar.SATURDAY -> DiaSemanaEnum.SABADO
+                    java.util.Calendar.SUNDAY -> DiaSemanaEnum.DOMINGO
+                    else -> return false
+                }
+                return horarios.any { it.diaSemana == dayOfWeek }
             }
             override fun isSelectableYear(year: Int): Boolean = true
         }
@@ -503,6 +522,7 @@ private fun AgendarTab(
                     horaSeleccionada = ""
                     pasoAgenda = 1
                     viewModel.limpiarDisponibilidad()
+                    viewModel.cargarHorariosBarbero(barbero.idBarbero!!)
                     if (fechaSeleccionada.length == 10)
                         viewModel.cargarDisponibilidad(
                             barbero.idBarbero!!, fechaSeleccionada)

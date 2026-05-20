@@ -20,6 +20,7 @@ data class BarberoUiState(
     val resenasConCliente: List<Pair<ResenaDTO, String>> = emptyList(),
     val promedio: Double = 0.0,
     val notificacionesCount: Int = 0,
+    val todosBloqueos: List<BloqueoHorarioDTO> = emptyList(),
     val errorMessage: String? = null,
     val successMessage: String? = null
 )
@@ -63,6 +64,20 @@ class BarberoViewModel(
                 val bloqueosList = if (bloqueos.isSuccessful) bloqueos.body() ?: emptyList() else emptyList()
                 val horariosList = if (horarios.isSuccessful) horarios.body() ?: emptyList() else emptyList()
 
+                val barberosResp = apiService.getBarberosActivos()
+                val todosBarberos = if (barberosResp.isSuccessful) barberosResp.body() ?: emptyList() else emptyList()
+                val todosBloqueosList = mutableListOf<BloqueoHorarioDTO>()
+                for (b in todosBarberos) {
+                    b.idBarbero?.let { id ->
+                        try {
+                            val bResp = apiService.getBloqueosByBarbero(id)
+                            if (bResp.isSuccessful) {
+                                todosBloqueosList.addAll(bResp.body() ?: emptyList())
+                            }
+                        } catch (_: Exception) { }
+                    }
+                }
+
                 val prom = if (resenasList.isNotEmpty())
                     resenasList.mapNotNull { it.calificacion }.average() else 0.0
 
@@ -86,7 +101,8 @@ class BarberoViewModel(
                     resenas = resenasList,
                     resenasConCliente = resConCliente,
                     promedio = prom,
-                    notificacionesCount = citas.size
+                    notificacionesCount = citas.size,
+                    todosBloqueos = todosBloqueosList.toList()
                 )
 
                 cargarCitasConDetalle()

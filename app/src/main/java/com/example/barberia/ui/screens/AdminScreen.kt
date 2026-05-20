@@ -993,8 +993,7 @@ private fun AdminHorariosTab(
     colores: BarberiaColores
 ) {
     var diaSeleccionado   by remember { mutableStateOf(DiaSemanaEnum.LUNES) }
-    var horaInicio        by remember { mutableStateOf("") }
-    var horaFin           by remember { mutableStateOf("") }
+    var turnoSeleccionado by remember { mutableStateOf<String?>(null) }
     var mostrarFormulario by remember { mutableStateOf(false) }
     var horarioAEliminar  by remember { mutableStateOf<HorarioBarberoDTO?>(null) }
     var citaSeleccionada  by remember { mutableStateOf<CitaConDetalle?>(null) }
@@ -1126,29 +1125,61 @@ private fun AdminHorariosTab(
                                     }
                                 }
 
-                                BarberiaTextField(horaInicio,
-                                    { horaInicio = it }, "Hora inicio (HH:mm)",
-                                    Icons.Filled.Schedule, AdminAccent, colores)
-                                BarberiaTextField(horaFin,
-                                    { horaFin = it }, "Hora fin (HH:mm)",
-                                    Icons.Filled.Schedule, AdminAccent, colores)
+                                val turnos = remember {
+                                    listOf(
+                                        "09:00-19:00" to "Completo (10h)",
+                                        "09:00-17:00" to "Mañana (8h)",
+                                        "10:00-19:00" to "Tarde (9h)",
+                                        "09:00-13:00" to "Media mañana (4h)",
+                                        "14:00-19:00" to "Media tarde (5h)",
+                                        "12:00-19:00" to "Tarde reducida (7h)"
+                                    )
+                                }
+                                Text("Horario del día", color = colores.textoSub,
+                                    fontSize = 12.sp)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()) {
+                                    turnos.forEach { (bloque, label) ->
+                                        val sel = turnoSeleccionado == bloque
+                                        FilterChip(
+                                            selected = sel,
+                                            onClick = {
+                                                turnoSeleccionado = if (sel) null else bloque
+                                            },
+                                            label = { Text(label, fontSize = 11.sp,
+                                                maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = AdminAccent,
+                                                selectedLabelColor = Color.White
+                                            ),
+                                            border = FilterChipDefaults.filterChipBorder(
+                                                borderColor = if (sel) AdminAccent else colores.borde,
+                                                selectedBorderColor = AdminAccent,
+                                                enabled = true,
+                                                selected = sel
+                                            )
+                                        )
+                                    }
+                                }
 
-                                val formListo = horaInicio.length == 5 && horaFin.length == 5
                                 BarberiaBoton(
                                     texto      = "Agregar horario",
                                     icono      = Icons.Filled.Add,
                                     isLoading  = uiState.isLoading,
-                                    colorFondo = if (formListo) AdminAccent else colores.borde,
+                                    colorFondo = if (turnoSeleccionado != null) AdminAccent else colores.borde,
                                     onClick    = {
-                                        if (formListo) {
-                                            viewModel.crearHorario(
-                                                idBarbero  = uiState.barberoSeleccionado!!.idBarbero!!,
-                                                diaSemana  = diaSeleccionado,
-                                                horaInicio = horaInicio,
-                                                horaFin    = horaFin
-                                            )
-                                            horaInicio = ""; horaFin = ""
-                                            mostrarFormulario = false
+                                        turnoSeleccionado?.let { bloque ->
+                                            val parts = bloque.split("-")
+                                            if (parts.size == 2) {
+                                                viewModel.crearHorario(
+                                                    idBarbero  = uiState.barberoSeleccionado!!.idBarbero!!,
+                                                    diaSemana  = diaSeleccionado,
+                                                    horaInicio = parts[0],
+                                                    horaFin    = parts[1]
+                                                )
+                                                turnoSeleccionado = null
+                                                mostrarFormulario = false
+                                            }
                                         }
                                     }
                                 )

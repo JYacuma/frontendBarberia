@@ -119,7 +119,7 @@ fun NotificacionesScreen(
                                     fontSize = 14.sp
                                 )
                                 Text(
-                                    notif.mensaje,
+                                    notif.mensaje ?: "",
                                     color = colores.textoSub,
                                     fontSize = 12.sp,
                                     maxLines = 2

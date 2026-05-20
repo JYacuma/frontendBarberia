@@ -56,12 +56,16 @@ fun SuperAdminScreen(
     nombre: String,
     onLogout: () -> Unit,
     onNavigateToNotificaciones: () -> Unit = {}
-)
+) {
+    val viewModel: SuperAdminViewModel = viewModel(
+        factory = SuperAdminViewModel.factory(apiService)
+    )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val pagerState    = rememberPagerState(pageCount = { 5 })
     val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
+    val colores = LocalBarberiaColores.current
 
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {

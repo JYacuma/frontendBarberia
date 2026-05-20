@@ -56,12 +56,16 @@ fun BarberoScreen(
     nombre: String,
     onLogout: () -> Unit,
     onNavigateToNotificaciones: () -> Unit = {}
-)
+) {
+    val viewModel: BarberoViewModel = viewModel(
+        factory = BarberoViewModel.factory(apiService, idBarbero, idUsuario)
+    )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val pagerState    = rememberPagerState(pageCount = { 4 })
     val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
+    val colores = LocalBarberiaColores.current
 
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {
@@ -122,9 +126,8 @@ private fun BarberoHeader(
     colores: BarberiaColores,
     onLogout: () -> Unit,
     onNavigateToNotificaciones: () -> Unit = {}
-)
-            )
-    ) {
+) {
+    Column {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -524,14 +527,19 @@ private fun AgendaTab(
     fun bloqueOcupado(bloque: String): Boolean {
         val parts = bloque.split("-")
         if (parts.size != 2) return false
+        val (inicio, finPart) = parts[0] to parts[1]
         return uiState.bloqueos.any { b ->
             val ini = b.fechaInicio?.substringAfter("T")?.take(5) ?: ""
             val fin = b.fechaFin?.substringAfter("T")?.take(5) ?: ""
-            ini <= parts[1] && fin >= parts[0]
+            ini < finPart && fin > inicio
         } || uiState.citasHoy.any { c ->
             val ci = c.horaInicio?.take(5) ?: ""
             val cf = c.horaFin?.take(5) ?: ""
-            ci < parts[1] && cf > parts[0]
+            ci < finPart && cf > inicio
+        } || uiState.todosBloqueos.any { b ->
+            val ini = b.fechaInicio?.substringAfter("T")?.take(5) ?: ""
+            val fin = b.fechaFin?.substringAfter("T")?.take(5) ?: ""
+            ini < finPart && fin > inicio
         }
     }
 

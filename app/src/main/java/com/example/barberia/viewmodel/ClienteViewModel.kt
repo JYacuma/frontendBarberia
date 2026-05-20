@@ -28,7 +28,8 @@ data class ClienteUiState(
     val popularBarberos: List<BarberoDTO> = emptyList(),
     val popularServicios: List<ServicioDTO> = emptyList(),
     val notificaciones: List<NotificacionDTO> = emptyList(),
-    val citasConDetalles: List<CitaConDetalle> = emptyList()
+    val citasConDetalles: List<CitaConDetalle> = emptyList(),
+    val barberoHorarios: List<HorarioBarberoDTO> = emptyList()
 )
 
 class ClienteViewModel(
@@ -254,6 +255,19 @@ class ClienteViewModel(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Error al enviar reseña")
             }
+        }
+    }
+
+    fun cargarHorariosBarbero(idBarbero: Long) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.getHorariosByBarbero(idBarbero)
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        barberoHorarios = response.body() ?: emptyList()
+                    )
+                }
+            } catch (_: Exception) { }
         }
     }
 

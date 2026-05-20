@@ -70,12 +70,14 @@ fun ClienteScreen(
     idUsuario: Long,
     nombre: String,
     onLogout: () -> Unit,
-    onNavigateToNotificaciones: () -> Unit = {}
+    onNavigateToNotificaciones: () -> Unit = {},
+    onNavigateToPerfil: () -> Unit = {}
 ) {
     val viewModel: ClienteViewModel = viewModel(
         factory = ClienteViewModel.factory(apiService, idUsuario)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
 
     val pagerState    = rememberPagerState(pageCount = { 3 })
     val scope         = rememberCoroutineScope()
@@ -95,7 +97,59 @@ fun ClienteScreen(
         }
     }
 
-    Scaffold(
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(modifier = Modifier.fillMaxHeight()) {
+                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                    val initials = getInitials(nombre)
+                    Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(ColorRojo),
+                        contentAlignment = Alignment.Center) {
+                        Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(nombre, color = colores.texto, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Text("CLIENTE", color = ColorRojo, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                    Divider(color = colores.borde, modifier = Modifier.padding(vertical = 16.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth().clickable { scope.launch { drawerState.close(); onNavigateToPerfil() } }.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Person, contentDescription = null, tint = colores.texto)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Perfil", color = colores.texto, fontSize = 16.sp)
+                    }
+
+                    Text("Tema", color = colores.textoSub, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Claro" to null, "Sistema" to false, "Oscuro" to true).forEach { (label, mode) ->
+                            FilterChip(
+                                selected = TemaManager.modoOscuro.value == mode,
+                                onClick = { TemaManager.modoOscuro.value = mode },
+                                label = { Text(label, fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ColorRojo.copy(alpha = 0.15f),
+                                    selectedLabelColor = ColorRojo
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    Divider(color = colores.borde, modifier = Modifier.padding(vertical = 8.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth().clickable { scope.launch { drawerState.close(); onLogout() } }.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = ColorRojo)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Cerrar sesión", color = ColorRojo, fontSize = 16.sp)
+                    }
+                }
+            }
+        }
+    ) {
+        Scaffold(
         containerColor = colores.fondo,
         snackbarHost = {
             SnackbarHost(snackbarState) { data ->
@@ -147,12 +201,16 @@ fun ClienteScreen(
             userScrollEnabled = true
         ) { pagina ->
             when (pagina) {
-                0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones)
+                0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones,
+                    onNavigateToPerfil = onNavigateToPerfil,
+                    onOpenDrawer = { scope.launch { drawerState.open() } })
                 1 -> AgendarTab(uiState, viewModel, colores)
-                2 -> MisCitasTab(uiState, viewModel, colores)
+        2 -> MisCitasTab(uiState, viewModel, colores)
             }
         }
     }
+}
+
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -167,7 +225,9 @@ private fun InicioTab(
     pagerState: androidx.compose.foundation.pager.PagerState,
     scope: kotlinx.coroutines.CoroutineScope,
     onLogout: () -> Unit,
-    onNavigateToNotificaciones: () -> Unit
+    onNavigateToNotificaciones: () -> Unit,
+    onNavigateToPerfil: () -> Unit = {},
+    onOpenDrawer: () -> Unit = {}
 ) {
     val initials = remember(nombre) {
         val ascii = Normalizer.normalize(nombre, Normalizer.Form.NFD)
@@ -176,12 +236,13 @@ private fun InicioTab(
     }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(modifier = Modifier.size(44.dp).clip(CircleShape)
                 .background(ColorRojo.copy(0.15f))
-                .border(1.5.dp, ColorRojo, CircleShape),
+                .border(1.5.dp, ColorRojo, CircleShape)
+                .clickable { onOpenDrawer() },
                 contentAlignment = Alignment.Center) {
                 Text(initials, color = ColorRojo,
                     fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -193,18 +254,6 @@ private fun InicioTab(
                 Text("Cliente", color = ColorRojo, fontSize = 12.sp)
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { TemaManager.toggleModo() }) {
-                Icon(
-                    imageVector = when (TemaManager.modoOscuro.value) {
-                        null  -> Icons.Filled.BrightnessMedium
-                        true  -> Icons.Filled.DarkMode
-                        false -> Icons.Filled.LightMode
-                    },
-                    contentDescription = "Modo",
-                    tint = colores.textoSub,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
             BadgedBox(badge = {
                 if (uiState.notificaciones.isNotEmpty()) {
                     Badge(containerColor = ColorRojo) {
@@ -217,10 +266,6 @@ private fun InicioTab(
                     Icon(Icons.Filled.Notifications, "Notificaciones",
                         tint = colores.texto, modifier = Modifier.size(22.dp))
                 }
-            }
-            IconButton(onClick = onLogout) {
-                Icon(Icons.AutoMirrored.Filled.Logout, "Cerrar sesión",
-                    tint = colores.textoSub, modifier = Modifier.size(20.dp))
             }
         }
         PullToRefreshBox(
@@ -1048,10 +1093,24 @@ private fun MisCitasTab(
                         citaParaCancelar = detalle
                     })
                 }
-            } else null,
-            dismissButton = {
-                TextButton(onClick = { citaDetalle = null }) {
-                    Text("Cerrar", color = colores.textoSub)
+            } else {
+                {
+                    TextButton(onClick = { citaDetalle = null }) {
+                        Text("Cerrar", color = colores.textoSub)
+                    }
+                }
+            },
+            dismissButton = if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE) {
+                {
+                    TextButton(onClick = { citaDetalle = null }) {
+                        Text("Cerrar", color = colores.textoSub)
+                    }
+                }
+            } else {
+                {
+                    TextButton(onClick = { citaDetalle = null }) {
+                        Text("Cerrar", color = colores.textoSub)
+                    }
                 }
             }
         )

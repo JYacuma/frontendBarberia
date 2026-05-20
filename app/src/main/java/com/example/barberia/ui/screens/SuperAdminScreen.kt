@@ -230,24 +230,27 @@ fun SuperInicioTab(
     onNavigateToTab: (Int) -> Unit,
     onNavigateToNotificaciones: () -> Unit = {},
     onOpenDrawer: () -> Unit = {}
-)
-                )) {
-                    Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+) {
+    LazyColumn {
+        item {
+            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
                         Brush.horizontalGradient(
                             listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
                         )))
                     Column(modifier = Modifier.padding(
-                        start = 20.dp, end = 20.dp, top = 52.dp, bottom = 20.dp)) {
+                        start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.Top) {
                             Row(verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Box(modifier = Modifier.size(52.dp).clip(CircleShape)
-                                    .background(SuperAccent),
+                                Box(modifier = Modifier.size(44.dp).clip(CircleShape)
+                                    .background(SuperAccent.copy(0.15f))
+                                    .border(1.5.dp, SuperAccent, CircleShape)
+                                    .clickable { onOpenDrawer() },
                                     contentAlignment = Alignment.Center) {
-                                    Text(getInitials(nombre), color = Color.White,
-                                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text(getInitials(nombre), color = SuperAccent,
+                                        fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 }
                                 Column {
                                     Row(verticalAlignment = Alignment.CenterVertically,
@@ -283,8 +286,7 @@ fun SuperInicioTab(
                             }
                         }
                     }
-                }
-            }
+        }
 
             item { Spacer(modifier = Modifier.height(20.dp)) }
 
@@ -366,7 +368,6 @@ fun SuperInicioTab(
                         }
                     }
                     Spacer(modifier = Modifier.height(20.dp))
-                }
             }
         }
     }
@@ -1293,6 +1294,7 @@ fun SuperCitasTab(
                                 EstadoCitaEnum.FINALIZADA -> "Finalizadas"
                                 EstadoCitaEnum.CANCELADA -> "Canceladas"
                                 EstadoCitaEnum.NO_PRESENTADO -> "No presentó"
+                                null -> "Filtrar"
                             }, fontSize = 13.sp)
                         Spacer(Modifier.width(4.dp))
                         Text("▼", fontSize = 10.sp)

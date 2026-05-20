@@ -55,15 +55,17 @@ fun BarberoScreen(
     idUsuario: Long,
     nombre: String,
     onLogout: () -> Unit,
-    onNavigateToNotificaciones: () -> Unit = {}
+    onNavigateToNotificaciones: () -> Unit = {},
+    onNavigateToPerfil: () -> Unit = {}
 ) {
     val viewModel: BarberoViewModel = viewModel(
         factory = BarberoViewModel.factory(apiService, idBarbero, idUsuario)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
     val pagerState    = rememberPagerState(pageCount = { 4 })
-    val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
     val colores = LocalBarberiaColores.current
 
@@ -80,36 +82,85 @@ fun BarberoScreen(
         }
     }
 
-    Scaffold(
-        containerColor = colores.fondo,
-        snackbarHost = {
-            SnackbarHost(snackbarState) { data ->
-                Snackbar(
-                    snackbarData   = data,
-                    containerColor = colores.superficie,
-                    contentColor   = colores.texto,
-                    actionColor    = ColorAzul,
-                    shape          = RoundedCornerShape(12.dp)
-                )
-            }
-        },
-        bottomBar = {
-            BarberoBottomBar(pagerState.currentPage, colores) { index ->
-                scope.launch { pagerState.animateScrollToPage(index) }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        gesturesEnabled = true,
+        drawerContent = {
+            ModalDrawerSheet(modifier = Modifier.fillMaxHeight()) {
+                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                    val initials = getInitials(nombre)
+                    Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(ColorAzul),
+                        contentAlignment = Alignment.Center) {
+                        Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(nombre, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = colores.texto)
+                    Text("Barbero", color = ColorAzul, fontSize = 13.sp)
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider()
+                    TextButton(onClick = { scope.launch { drawerState.close() }; onNavigateToPerfil() }) {
+                        Icon(Icons.Filled.Person, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Mi Perfil")
+                    }
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    Text("Tema", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = colores.textoSub)
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val opciones = listOf("Claro" to false, "Sistema" to null, "Oscuro" to true)
+                        opciones.forEach { (label, valor) ->
+                            FilterChip(
+                                selected = TemaManager.modoOscuro.value == valor,
+                                onClick = { TemaManager.modoOscuro.value = valor },
+                                label = { Text(label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Button(onClick = onLogout, colors = ButtonDefaults.buttonColors(containerColor = ColorError),
+                        modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.AutoMirrored.Filled.Logout, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Cerrar sesión")
+                    }
+                }
             }
         }
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            HorizontalPager(
-                state             = pagerState,
-                modifier          = Modifier.weight(1f),
-                userScrollEnabled = true
-            ) { pagina ->
-                when (pagina) {
-                    0 -> HoyTab(nombre, uiState, viewModel, colores, onLogout, onNavigateToNotificaciones)
-                    1 -> AgendaTab(uiState, viewModel, colores)
-                    2 -> ResenasBarberoTab(uiState, colores)
-                    3 -> HorariosBarberoTab(uiState, colores)
+    ) {
+        Scaffold(
+            containerColor = colores.fondo,
+            snackbarHost = {
+                SnackbarHost(snackbarState) { data ->
+                    Snackbar(
+                        snackbarData   = data,
+                        containerColor = colores.superficie,
+                        contentColor   = colores.texto,
+                        actionColor    = ColorAzul,
+                        shape          = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            bottomBar = {
+                BarberoBottomBar(pagerState.currentPage, colores) { index ->
+                    scope.launch { pagerState.animateScrollToPage(index) }
+                }
+            }
+        ) { padding ->
+            Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+                HorizontalPager(
+                    state             = pagerState,
+                    modifier          = Modifier.weight(1f),
+                    userScrollEnabled = true
+                ) { pagina ->
+                    when (pagina) {
+                        0 -> HoyTab(nombre, uiState, viewModel, colores, onLogout, onNavigateToNotificaciones,
+                            onNavigateToPerfil = onNavigateToPerfil,
+                            onOpenDrawer = { scope.launch { drawerState.open() } })
+                        1 -> AgendaTab(uiState, viewModel, colores)
+                        2 -> ResenasBarberoTab(uiState, colores)
+                        3 -> HorariosBarberoTab(uiState, colores)
+                    }
                 }
             }
         }
@@ -262,7 +313,9 @@ private fun HoyTab(
     viewModel: BarberoViewModel,
     colores: BarberiaColores,
     onLogout: () -> Unit,
-    onNavigateToNotificaciones: () -> Unit = {}
+    onNavigateToNotificaciones: () -> Unit = {},
+    onNavigateToPerfil: () -> Unit = {},
+    onOpenDrawer: () -> Unit = {}
 ) {
     var filtroEstado by remember { mutableStateOf<EstadoCitaEnum?>(null) }
     var citaAccion     by remember { mutableStateOf<CitaDTO?>(null) }
@@ -285,7 +338,7 @@ private fun HoyTab(
         ) {
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 16.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -293,13 +346,16 @@ private fun HoyTab(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Box(
-                            modifier = Modifier.size(44.dp).clip(CircleShape).background(ColorAzul),
+                    Box(
+                            modifier = Modifier.size(44.dp).clip(CircleShape)
+                                .background(ColorAzul.copy(0.15f))
+                                .border(1.5.dp, ColorAzul, CircleShape)
+                                .clickable { onOpenDrawer() },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = getInitials(nombre),
-                                color = Color.White,
+                                color = ColorAzul,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )
@@ -332,31 +388,12 @@ private fun HoyTab(
                                 }
                             }
                         }
-                        IconButton(onClick = { TemaManager.toggleModo() }) {
-                            Icon(
-                                imageVector = when (TemaManager.modoOscuro.value) {
-                                    null  -> Icons.Filled.BrightnessMedium
-                                    true  -> Icons.Filled.DarkMode
-                                    false -> Icons.Filled.LightMode
-                                },
-                                contentDescription = "Modo",
-                                tint = colores.textoSub,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        BotonIconoBarbero(Icons.AutoMirrored.Filled.Logout, colores.textoSub, onLogout)
                     }
                 }
             }
             item {
                 Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(ColorAzul))
-                        Text("BARBERO", color = ColorAzul, fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text("$nombre, hoy tienes", color = colores.texto,
                         fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     val citasActivas = uiState.citasHoy.count {
@@ -870,8 +907,8 @@ private fun HorariosBarberoTab(
         }
 
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                diasSemana.forEach { dia ->
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                items(diasSemana) { dia ->
                     val seleccionado = selectedDay == dia
                     FilterChip(
                         selected = seleccionado,

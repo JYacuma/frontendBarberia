@@ -255,7 +255,7 @@ class MainActivity : ComponentActivity() {
                                 if (idUsuario.value != 0L) {
                                     PerfilScreen(
                                         apiService = RetrofitClient.apiService,
-                                        idUsuario = idUsuario.value,
+                                        idUsuario = idUsuario.value ?: 0L,
                                         onVolver = { navController.popBackStack() }
                                     )
                                 } else {

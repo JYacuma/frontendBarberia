@@ -306,17 +306,19 @@ private fun AdminInicioTab(
                             listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
                         )))
                     Column(modifier = Modifier.padding(
-                        start = 20.dp, end = 20.dp, top = 52.dp, bottom = 20.dp)) {
+                        start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.Top) {
                             Row(verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Box(modifier = Modifier.size(52.dp).clip(CircleShape)
-                                    .background(AdminAccent).clickable { scope.launch { drawerState.open() } },
+                                Box(modifier = Modifier.size(44.dp).clip(CircleShape)
+                                    .background(AdminAccent.copy(0.15f))
+                                    .border(1.5.dp, AdminAccent, CircleShape)
+                                    .clickable { scope.launch { drawerState.open() } },
                                     contentAlignment = Alignment.Center) {
-                                    Text(getInitials(nombre), color = Color.White,
-                                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text(getInitials(nombre), color = AdminAccent,
+                                        fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 }
                                 Column {
                                     Row(verticalAlignment = Alignment.CenterVertically,
@@ -1169,7 +1171,7 @@ private fun AdminHorariosTab(
     viewModel: AdminViewModel,
     colores: BarberiaColores
 ) {
-    var diaSeleccionado   by remember { mutableStateOf(DiaSemanaEnum.LUNES) }
+    var diaSeleccionado   by remember { mutableStateOf<DiaSemanaEnum?>(null) }
     var turnoSeleccionado by remember { mutableStateOf<String?>(null) }
     var mostrarFormulario by remember { mutableStateOf(false) }
     var horarioAEliminar  by remember { mutableStateOf<HorarioBarberoDTO?>(null) }
@@ -1177,6 +1179,9 @@ private fun AdminHorariosTab(
     var mostrarConfirmEliminarCita by remember { mutableStateOf(false) }
     var citaEliminadaOk   by remember { mutableStateOf(false) }
     var isRefreshing      by remember { mutableStateOf(false) }
+    var horaInicioCustom  by remember { mutableStateOf("09:00") }
+    var horaFinCustom     by remember { mutableStateOf("19:00") }
+    var usarHorarioCustom by remember { mutableStateOf(false) }
 
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -1195,22 +1200,24 @@ private fun AdminHorariosTab(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Text("Horarios", color = colores.texto,
                     fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("Gestiona los horarios de cada barbero",
+                Text("Selecciona un barbero para gestionar sus horarios",
                     color = colores.textoSub, fontSize = 13.sp)
             }
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Seleccionar barbero", color = colores.texto,
-                        fontWeight = FontWeight.Medium, fontSize = 14.sp)
                     uiState.barberos.forEach { barbero ->
                         val sel = uiState.barberoSeleccionado?.idBarbero == barbero.idBarbero
                         Card(
                             modifier = Modifier.fillMaxWidth()
-                                .clickable { viewModel.seleccionarBarbero(barbero) },
+                                .clickable {
+                                    viewModel.seleccionarBarbero(barbero)
+                                    diaSeleccionado = null
+                                    mostrarFormulario = false
+                                },
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = if (sel) AdminAccent else colores.superficie),
@@ -1220,13 +1227,12 @@ private fun AdminHorariosTab(
                             Row(modifier = Modifier.padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Box(modifier = Modifier.size(36.dp)
-                                    .clip(RoundedCornerShape(10.dp))
+                                Box(modifier = Modifier.size(40.dp).clip(CircleShape)
                                     .background(if (sel) Color.White.copy(0.2f) else AdminAccentSoft),
                                     contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Filled.Person, null,
-                                        tint = if (sel) Color.White else AdminAccent,
-                                        modifier = Modifier.size(18.dp))
+                                    Text(barbero.nombre.take(2).uppercase(),
+                                        color = if (sel) Color.White else AdminAccent,
+                                        fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(barbero.nombre,
@@ -1247,31 +1253,31 @@ private fun AdminHorariosTab(
 
             if (uiState.barberoSeleccionado != null) {
                 item {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
-                        Text("Horario semanal", color = colores.texto,
-                            fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Column {
+                            Text("Horarios de ${uiState.barberoSeleccionado!!.nombre}",
+                                color = colores.texto, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("Toca un día para agregar horario",
+                                color = colores.textoSub, fontSize = 12.sp)
+                        }
                         FloatingActionButton(
                             onClick = { mostrarFormulario = !mostrarFormulario },
                             containerColor = AdminAccent,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
                                 if (mostrarFormulario) Icons.Filled.Close
                                 else Icons.Filled.Add,
-                                null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                null, tint = Color.White, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
 
-                item {
-                    Box {
-                    AnimatedVisibility(
-                        visible = mostrarFormulario,
-                        enter   = expandVertically() + fadeIn(),
-                        exit    = shrinkVertically() + fadeOut()
-                    ) {
+                if (mostrarFormulario) {
+                    item {
                         Card(modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(
@@ -1302,166 +1308,179 @@ private fun AdminHorariosTab(
                                     }
                                 }
 
-                                val turnos = remember {
-                                    listOf(
-                                        "09:00-19:00" to "Completo (10h)",
-                                        "09:00-17:00" to "Mañana (8h)",
-                                        "10:00-19:00" to "Tarde (9h)",
-                                        "09:00-13:00" to "Media mañana (4h)",
-                                        "14:00-19:00" to "Media tarde (5h)",
-                                        "12:00-19:00" to "Tarde reducida (7h)"
-                                    )
+                                Row(modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Horario personalizado", color = colores.textoSub, fontSize = 12.sp)
+                                    Switch(checked = usarHorarioCustom,
+                                        onCheckedChange = { usarHorarioCustom = it },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = AdminAccent,
+                                            uncheckedThumbColor = Color.White,
+                                            uncheckedTrackColor = colores.borde))
                                 }
-                                Text("Horario del día", color = colores.textoSub,
-                                    fontSize = 12.sp)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth()) {
-                                    turnos.forEach { (bloque, label) ->
-                                        val sel = turnoSeleccionado == bloque
-                                        FilterChip(
-                                            selected = sel,
-                                            onClick = {
-                                                turnoSeleccionado = if (sel) null else bloque
-                                            },
-                                            label = { Text(label, fontSize = 11.sp,
-                                                maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = AdminAccent,
-                                                selectedLabelColor = Color.White
-                                            ),
-                                            border = FilterChipDefaults.filterChipBorder(
-                                                borderColor = if (sel) AdminAccent else colores.borde,
-                                                selectedBorderColor = AdminAccent,
-                                                enabled = true,
-                                                selected = sel
-                                            )
+
+                                if (usarHorarioCustom) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedTextField(
+                                            value = horaInicioCustom,
+                                            onValueChange = { horaInicioCustom = it },
+                                            label = { Text("Inicio", fontSize = 11.sp) },
+                                            modifier = Modifier.weight(1f),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
                                         )
+                                        OutlinedTextField(
+                                            value = horaFinCustom,
+                                            onValueChange = { horaFinCustom = it },
+                                            label = { Text("Fin", fontSize = 11.sp) },
+                                            modifier = Modifier.weight(1f),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                                        )
+                                    }
+                                } else {
+                                    val turnos = remember {
+                                        listOf(
+                                            "09:00-19:00" to "Completo (10h)",
+                                            "09:00-17:00" to "Mañana (8h)",
+                                            "10:00-19:00" to "Tarde (9h)",
+                                            "09:00-13:00" to "Media mañana (4h)",
+                                            "14:00-19:00" to "Media tarde (5h)",
+                                            "12:00-19:00" to "Tarde reducida (7h)"
+                                        )
+                                    }
+                                    Text("Turnos predefinidos", color = colores.textoSub, fontSize = 12.sp)
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        items(turnos) { (bloque, label) ->
+                                            val sel = turnoSeleccionado == bloque
+                                            FilterChip(
+                                                selected = sel,
+                                                onClick = { turnoSeleccionado = if (sel) null else bloque },
+                                                label = { Text(label, fontSize = 10.sp) },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = AdminAccent,
+                                                    selectedLabelColor = Color.White
+                                                )
+                                            )
+                                        }
                                     }
                                 }
 
+                                val puedeGuardar = diaSeleccionado != null &&
+                                        (turnoSeleccionado != null || (usarHorarioCustom &&
+                                                horaInicioCustom.isNotBlank() && horaFinCustom.isNotBlank()))
                                 BarberiaBoton(
                                     texto      = "Agregar horario",
                                     icono      = Icons.Filled.Add,
                                     isLoading  = uiState.isLoading,
-                                    colorFondo = if (turnoSeleccionado != null) AdminAccent else colores.borde,
+                                    colorFondo = if (puedeGuardar) AdminAccent else colores.borde,
                                     onClick    = {
-                                        turnoSeleccionado?.let { bloque ->
-                                            val parts = bloque.split("-")
-                                            if (parts.size == 2) {
-                                                viewModel.crearHorario(
-                                                    idBarbero  = uiState.barberoSeleccionado!!.idBarbero!!,
-                                                    diaSemana  = diaSeleccionado,
-                                                    horaInicio = parts[0],
-                                                    horaFin    = parts[1]
-                                                )
-                                                turnoSeleccionado = null
-                                                mostrarFormulario = false
+                                        if (usarHorarioCustom) {
+                                            viewModel.crearHorario(
+                                                idBarbero  = uiState.barberoSeleccionado!!.idBarbero!!,
+                                                diaSemana  = diaSeleccionado!!,
+                                                horaInicio = horaInicioCustom,
+                                                horaFin    = horaFinCustom
+                                            )
+                                        } else {
+                                            turnoSeleccionado?.let { bloque ->
+                                                val parts = bloque.split("-")
+                                                if (parts.size == 2) {
+                                                    viewModel.crearHorario(
+                                                        idBarbero  = uiState.barberoSeleccionado!!.idBarbero!!,
+                                                        diaSemana  = diaSeleccionado!!,
+                                                        horaInicio = parts[0],
+                                                        horaFin    = parts[1]
+                                                    )
+                                                }
                                             }
                                         }
+                                        turnoSeleccionado = null
+                                        diaSeleccionado = null
+                                        mostrarFormulario = false
                                     }
                                 )
                             }
                         }
                     }
+                }
+
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        items(DiaSemanaEnum.entries.toTypedArray()) { dia ->
+                            val horariosDia = uiState.horarios.filter { it.diaSemana == dia }
+                            val tieneHorario = horariosDia.isNotEmpty()
+                            val seleccionado = diaSeleccionado == dia
+                            Box(modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (seleccionado) AdminAccent else colores.superficie)
+                                .border(1.dp, if (tieneHorario) AdminAccent else colores.borde,
+                                    RoundedCornerShape(12.dp))
+                                .clickable { diaSeleccionado = dia }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(dia.name.take(3),
+                                        color = if (seleccionado) Color.White else colores.texto,
+                                        fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    if (tieneHorario) {
+                                        Text("${horariosDia.size}",
+                                            color = if (seleccionado) Color.White.copy(0.8f) else AdminAccent,
+                                            fontSize = 10.sp)
+                                    } else {
+                                        Text("Libre",
+                                            color = if (seleccionado) Color.White.copy(0.8f) else ColorRojo.copy(0.6f),
+                                            fontSize = 9.sp)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
-                if (uiState.horarios.isEmpty() && uiState.todasLasCitas.none {
-                        it.idBarbero == uiState.barberoSeleccionado!!.idBarbero
-                    }) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().height(120.dp),
-                            contentAlignment = Alignment.Center) {
-                            Text("Sin horarios ni citas para este barbero",
-                                color = colores.textoSub, fontSize = 14.sp)
-                        }
-                    }
-                } else {
-                    val barberoId = uiState.barberoSeleccionado!!.idBarbero!!
-                    val citasBarbero = uiState.citasConDetalles.filter {
-                        it.cita.idBarbero == barberoId
-                    }
-                    DiaSemanaEnum.entries.forEach { dia ->
-                        val horariosDia = uiState.horarios.filter { it.diaSemana == dia }
-                        val citasDia = citasBarbero.filter {
-                            getDiaSemanaFromFecha(it.cita.fecha) == dia
-                        }
+                if (diaSeleccionado != null) {
+                    val horariosDelDia = uiState.horarios.filter { it.diaSemana == diaSeleccionado }
+                    if (horariosDelDia.isEmpty()) {
                         item {
-                            Column(modifier = Modifier.padding(top = 4.dp)) {
-                                val tieneHorario = horariosDia.isNotEmpty()
-                                Row(verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text(
-                                        dia.name.lowercase().replaceFirstChar { it.uppercase() },
-                                        color = if (!tieneHorario) ColorRojo
-                                        else AdminAccent,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    if (!tieneHorario) {
-                                        Text("Descanso",
-                                            color = ColorRojo.copy(0.6f), fontSize = 11.sp)
-                                    }
+                            Box(modifier = Modifier.fillMaxWidth().height(100.dp),
+                                contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Filled.Schedule, null,
+                                        tint = colores.textoSub, modifier = Modifier.size(32.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Sin horario para ${diaSeleccionado!!.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                                        color = colores.textoSub, fontSize = 13.sp)
+                                    Text("Toca + para agregar",
+                                        color = colores.textoSub, fontSize = 11.sp)
                                 }
-                                if (tieneHorario) {
-                                    horariosDia.forEach { horario ->
-                                        Row(verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.padding(vertical = 2.dp)) {
+                            }
+                        }
+                    } else {
+                        items(horariosDelDia) { horario ->
+                            Card(modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = colores.superficie),
+                                elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+                                Row(modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Row(verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Box(modifier = Modifier.size(36.dp).clip(CircleShape)
+                                            .background(AdminAccentSoft),
+                                            contentAlignment = Alignment.Center) {
                                             Icon(Icons.Filled.Schedule, null,
-                                                tint = AdminAccent,
-                                                modifier = Modifier.size(14.dp))
-                                            Text(
-                                                "${horario.horaInicio?.take(5)} - ${horario.horaFin?.take(5)}",
-                                                color = colores.textoSub, fontSize = 12.sp)
+                                                tint = AdminAccent, modifier = Modifier.size(18.dp))
+                                        }
+                                        Column {
+                                            Text("${horario.horaInicio?.take(5)} - ${horario.horaFin?.take(5)}",
+                                                color = colores.texto, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Text(diaSeleccionado!!.name.lowercase().replaceFirstChar { it.uppercase() },
+                                                color = colores.textoSub, fontSize = 11.sp)
                                         }
                                     }
-                                }
-                                if (citasDia.isNotEmpty()) {
-                                    citasDia.forEach { detalle ->
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth()
-                                                .padding(top = 4.dp)
-                                                .clickable {
-                                                    citaSeleccionada = detalle
-                                                },
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = AdminAccentSoft),
-                                            elevation = CardDefaults.cardElevation(
-                                                defaultElevation = colores.sombra.dp)
-                                        ) {
-                                            Row(modifier = Modifier.padding(10.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Box(modifier = Modifier.size(28.dp)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(AdminAccent),
-                                                    contentAlignment = Alignment.Center) {
-                                                    Text("${detalle.cita.horaInicio?.take(5)}",
-                                                        color = Color.White, fontSize = 9.sp,
-                                                        fontWeight = FontWeight.Bold)
-                                                }
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(detalle.clienteNombre,
-                                                        color = colores.texto,
-                                                        fontWeight = FontWeight.Medium,
-                                                        fontSize = 12.sp,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis)
-                                                    Text(detalle.servicioNombre,
-                                                        color = colores.textoSub, fontSize = 11.sp)
-                                                }
-                                                Box(modifier = Modifier
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(AdminAccent)
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)) {
-                                                    Text("${detalle.cita.horaInicio?.take(5)}",
-                                                        color = Color.White, fontSize = 9.sp,
-                                                        fontWeight = FontWeight.Bold)
-                                                }
-                                            }
-                                        }
+                                    IconButton(onClick = { horarioAEliminar = horario }) {
+                                        Icon(Icons.Filled.DeleteOutline, null,
+                                            tint = ColorError, modifier = Modifier.size(20.dp))
                                     }
                                 }
                             }

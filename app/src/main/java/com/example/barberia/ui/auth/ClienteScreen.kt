@@ -295,63 +295,75 @@ private fun InicioTab(
                         SeccionTituloCliente("Nuestros Barberos", colores,
                             modifier = Modifier.padding(horizontal = 20.dp))
                         Spacer(modifier = Modifier.height(10.dp))
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(horizontal = 20.dp)
-                        ) {
-                            items(uiState.popularBarberos.ifEmpty { uiState.barberos }) { barbero ->
-                                val expandido = barberoExpandido == barbero.idBarbero.toString()
-                                Card(
-                                    modifier = Modifier
-                                        .width(if (expandido) 200.dp else 120.dp)
-                                        .shadow(4.dp, RoundedCornerShape(16.dp))
-                                        .clickable {
-                                            barberoExpandido = if (expandido) null else barbero.idBarbero.toString()
-                                        },
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = colores.superficie)
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Box(modifier = Modifier.size(60.dp).clip(RoundedCornerShape(16.dp))
-                                            .background(ColorRojo.copy(0.15f))
-                                            .border(1.5.dp, ColorRojo.copy(0.3f), RoundedCornerShape(16.dp)),
-                                            contentAlignment = Alignment.Center) {
-                                            Text(barbero.nombre.take(2).uppercase(),
-                                                color = ColorRojo,
-                                                fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                                        }
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(barbero.nombre, color = colores.texto,
-                                            fontSize = 13.sp, textAlign = TextAlign.Center,
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        barbero.especialidad?.let {
-                                            Text(it, color = ColorRojo,
-                                                fontSize = 10.sp,
-                                                textAlign = TextAlign.Center,
-                                                fontWeight = FontWeight.Medium)
-                                        }
-                                        if (expandido) {
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            HorizontalDivider(color = colores.borde)
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            Text("Especialidad: ${barbero.especialidad ?: "General"}",
-                                                color = colores.textoSub, fontSize = 11.sp)
-                                            if (!barbero.telefono.isNullOrBlank()) {
-                                                Text("Teléfono: ${barbero.telefono}",
-                                                    color = colores.textoSub, fontSize = 11.sp)
+                        
+                        val barberosMostrar = uiState.popularBarberos.ifEmpty { uiState.barberos }
+                        
+                        if (barberosMostrar.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxWidth().height(100.dp),
+                                contentAlignment = Alignment.Center) {
+                                Text("No hay barberos disponibles",
+                                    color = colores.textoSub, fontSize = 13.sp)
+                            }
+                        } else {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                contentPadding = PaddingValues(horizontal = 20.dp)
+                            ) {
+                                items(barberosMostrar, key = { it.idBarbero ?: 0 }) { barbero ->
+                                    val expandido = barberoExpandido == barbero.idBarbero.toString()
+                                    Card(
+                                        modifier = Modifier
+                                            .width(if (expandido) 200.dp else 120.dp)
+                                            .shadow(4.dp, RoundedCornerShape(16.dp))
+                                            .clickable {
+                                                barberoExpandido = if (expandido) null else barbero.idBarbero.toString()
+                                            },
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = colores.superficie)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Box(modifier = Modifier.size(60.dp).clip(RoundedCornerShape(16.dp))
+                                                .background(ColorRojo.copy(0.15f))
+                                                .border(1.5.dp, ColorRojo.copy(0.3f), RoundedCornerShape(16.dp)),
+                                                contentAlignment = Alignment.Center) {
+                                                Text(barbero.nombre.take(2).uppercase(),
+                                                    color = ColorRojo,
+                                                    fontWeight = FontWeight.Bold, fontSize = 18.sp)
                                             }
                                             Spacer(modifier = Modifier.height(8.dp))
-                                            BarberiaBoton(
-                                                texto = "Agendar con ${barbero.nombre.split(" ").first()}",
-                                                colorFondo = ColorRojo,
-                                                onClick = {
-                                                    barberoExpandido = null
-                                                    scope.launch { pagerState.animateScrollToPage(1) }
+                                            Text(barbero.nombre, color = colores.texto,
+                                                fontSize = 13.sp, textAlign = TextAlign.Center,
+                                                fontWeight = FontWeight.Medium,
+                                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            barbero.especialidad?.let {
+                                                Text(it, color = ColorRojo,
+                                                    fontSize = 10.sp,
+                                                    textAlign = TextAlign.Center,
+                                                    fontWeight = FontWeight.Medium)
+                                            }
+                                            if (expandido) {
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                HorizontalDivider(color = colores.borde)
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Text("Especialidad: ${barbero.especialidad ?: "General"}",
+                                                    color = colores.textoSub, fontSize = 11.sp)
+                                                if (!barbero.telefono.isNullOrBlank()) {
+                                                    Text("Teléfono: ${barbero.telefono}",
+                                                        color = colores.textoSub, fontSize = 11.sp)
                                                 }
-                                            )
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                BarberiaBoton(
+                                                    texto = "Agendar",
+                                                    colorFondo = ColorRojo,
+                                                    onClick = {
+                                                        barberoSeleccionado = barbero
+                                                        barberoExpandido = null
+                                                        scope.launch { pagerState.animateScrollToPage(1) }
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -709,65 +721,83 @@ private fun AgendarTab(
                 PasoTituloCliente("1. Elige tu barbero", colores)
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (especialidades.isNotEmpty()) {
-                    Box {
-                        OutlinedButton(onClick = { expandidoEspecialidad = true }) {
-                            Text(if (filtroEspecialidad.isNullOrBlank()) "Filtrar por especialidad"
-                                else filtroEspecialidad!!, fontSize = 13.sp)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(Icons.Filled.ArrowDropDown, null)
-                        }
-                        DropdownMenu(
-                            expanded = expandidoEspecialidad,
-                            onDismissRequest = { expandidoEspecialidad = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Todos") },
-                                onClick = { filtroEspecialidad = null; expandidoEspecialidad = false }
-                            )
-                            especialidades.forEach { esp ->
-                                DropdownMenuItem(
-                                    text = { Text(esp) },
-                                    onClick = { filtroEspecialidad = esp; expandidoEspecialidad = false }
-                                )
-                            }
+                if (uiState.isLoading) {
+                    Box(modifier = Modifier.fillMaxWidth().height(100.dp),
+                        contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = ColorRojo, modifier = Modifier.size(32.dp))
+                    }
+                } else if (barberosFiltrados.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().height(100.dp),
+                        contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Filled.Person, null,
+                                tint = colores.textoSub, modifier = Modifier.size(32.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("No hay barberos disponibles",
+                                color = colores.textoSub, fontSize = 13.sp)
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(barberosFiltrados) { barbero ->
-                        val seleccionado = barberoSeleccionado?.idBarbero == barbero.idBarbero
-                        Card(
-                            modifier = Modifier.width(120.dp)
-                                .shadow(4.dp, RoundedCornerShape(14.dp))
-                                .clickable {
-                                    barberoSeleccionado = barbero
-                                    viewModel.cargarHorariosBarbero(barbero.idBarbero!!)
-                                },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (seleccionado) ColorRojo else colores.superficie)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(modifier = Modifier.size(44.dp).clip(CircleShape)
-                                    .background(if (seleccionado) Color.White.copy(0.2f) else ColorRojo.copy(0.15f)),
-                                    contentAlignment = Alignment.Center) {
-                                    Text(barbero.nombre.take(2).uppercase(),
-                                        color = if (seleccionado) Color.White else ColorRojo,
-                                        fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                } else {
+                    if (especialidades.isNotEmpty()) {
+                        Box {
+                            OutlinedButton(onClick = { expandidoEspecialidad = true }) {
+                                Text(if (filtroEspecialidad.isNullOrBlank()) "Filtrar por especialidad"
+                                    else filtroEspecialidad!!, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(Icons.Filled.ArrowDropDown, null)
+                            }
+                            DropdownMenu(
+                                expanded = expandidoEspecialidad,
+                                onDismissRequest = { expandidoEspecialidad = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Todos") },
+                                    onClick = { filtroEspecialidad = null; expandidoEspecialidad = false }
+                                )
+                                especialidades.forEach { esp ->
+                                    DropdownMenuItem(
+                                        text = { Text(esp) },
+                                        onClick = { filtroEspecialidad = esp; expandidoEspecialidad = false }
+                                    )
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(barbero.nombre,
-                                    color = if (seleccionado) Color.White else colores.texto,
-                                    fontSize = 12.sp, textAlign = TextAlign.Center,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                barbero.especialidad?.let {
-                                    Text(it,
-                                        color = if (seleccionado) Color.White.copy(0.7f) else colores.textoSub,
-                                        fontSize = 10.sp, textAlign = TextAlign.Center)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(barberosFiltrados, key = { it.idBarbero ?: 0 }) { barbero ->
+                            val seleccionado = barberoSeleccionado?.idBarbero == barbero.idBarbero
+                            Card(
+                                modifier = Modifier.width(120.dp)
+                                    .shadow(4.dp, RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        barberoSeleccionado = barbero
+                                        viewModel.cargarHorariosBarbero(barbero.idBarbero!!)
+                                    },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (seleccionado) ColorRojo else colores.superficie)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(modifier = Modifier.size(44.dp).clip(CircleShape)
+                                        .background(if (seleccionado) Color.White.copy(0.2f) else ColorRojo.copy(0.15f)),
+                                        contentAlignment = Alignment.Center) {
+                                        Text(barbero.nombre.take(2).uppercase(),
+                                            color = if (seleccionado) Color.White else ColorRojo,
+                                            fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(barbero.nombre,
+                                        color = if (seleccionado) Color.White else colores.texto,
+                                        fontSize = 12.sp, textAlign = TextAlign.Center,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    barbero.especialidad?.let {
+                                        Text(it,
+                                            color = if (seleccionado) Color.White.copy(0.7f) else colores.textoSub,
+                                            fontSize = 10.sp, textAlign = TextAlign.Center)
+                                    }
                                 }
                             }
                         }
@@ -782,33 +812,41 @@ private fun AgendarTab(
                         PasoTituloCliente("2. Elige el servicio", colores)
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            uiState.servicios.forEach { servicio ->
-                                val sel = servicioSeleccionado?.idServicio == servicio.idServicio
-                                Card(
-                                    modifier = Modifier.fillMaxWidth()
-                                        .shadow(4.dp, RoundedCornerShape(14.dp))
-                                        .clickable {
-                                            servicioSeleccionado = servicio
-                                        },
-                                    shape = RoundedCornerShape(14.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (sel) ColorRojo else colores.superficie)
-                                ) {
-                                    Row(modifier = Modifier.padding(16.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(servicio.nombre,
-                                                color = if (sel) Color.White else colores.texto,
-                                                fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                            Text("${servicio.duracionMinutos} min",
-                                                color = if (sel) Color.White.copy(0.7f)
-                                                else colores.textoSub, fontSize = 12.sp)
+                        if (uiState.servicios.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxWidth().height(80.dp),
+                                contentAlignment = Alignment.Center) {
+                                Text("No hay servicios disponibles",
+                                    color = colores.textoSub, fontSize = 13.sp)
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                uiState.servicios.forEach { servicio ->
+                                    val sel = servicioSeleccionado?.idServicio == servicio.idServicio
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth()
+                                            .shadow(4.dp, RoundedCornerShape(14.dp))
+                                            .clickable {
+                                                servicioSeleccionado = servicio
+                                            },
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (sel) ColorRojo else colores.superficie)
+                                    ) {
+                                        Row(modifier = Modifier.padding(16.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(servicio.nombre,
+                                                    color = if (sel) Color.White else colores.texto,
+                                                    fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                                Text("${servicio.duracionMinutos} min",
+                                                    color = if (sel) Color.White.copy(0.7f)
+                                                    else colores.textoSub, fontSize = 12.sp)
+                                            }
+                                            Text("\$${servicio.precio.toInt()}",
+                                                color = if (sel) Color.White else ColorRojo,
+                                                fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                         }
-                                        Text("\$${servicio.precio.toInt()}",
-                                            color = if (sel) Color.White else ColorRojo,
-                                            fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                     }
                                 }
                             }
@@ -848,7 +886,7 @@ private fun AgendarTab(
 
             // Paso 4 — Hora
             item {
-                if (fechaSeleccionada.isNotBlank()) {
+                if (fechaSeleccionada.isNotBlank() && barberoSeleccionado != null) {
                     Column {
                         PasoTituloCliente("4. Elige la hora", colores)
                         Spacer(modifier = Modifier.height(8.dp))
@@ -863,15 +901,23 @@ private fun AgendarTab(
                                 it.get(java.util.Calendar.MINUTE))
                         }
 
-                        LaunchedEffect(fechaSeleccionada, barberoSeleccionado) {
+                        LaunchedEffect(fechaSeleccionada, barberoSeleccionado?.idBarbero) {
                             if (fechaSeleccionada.isNotBlank() && barberoSeleccionado != null) {
                                 viewModel.cargarDisponibilidad(barberoSeleccionado!!.idBarbero!!, fechaSeleccionada)
                             }
                         }
 
-                        if (uiState.horasDisponibles.isEmpty()) {
-                            Text("Cargando horas disponibles...",
-                                color = colores.textoSub, fontSize = 13.sp)
+                        if (uiState.isLoading) {
+                            Box(modifier = Modifier.fillMaxWidth().height(60.dp),
+                                contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = ColorRojo, modifier = Modifier.size(28.dp))
+                            }
+                        } else if (uiState.horasDisponibles.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxWidth().height(60.dp),
+                                contentAlignment = Alignment.Center) {
+                                Text("No hay horas disponibles para esta fecha",
+                                    color = colores.textoSub, fontSize = 13.sp)
+                            }
                         } else {
                             val horasFiltradas = if (fechaSeleccionada == fechaHoy) {
                                 uiState.horasDisponibles.filter { it.take(5) > horaActual }
@@ -880,7 +926,7 @@ private fun AgendarTab(
                             }
 
                             if (horasFiltradas.isEmpty()) {
-                                Text("No hay horas disponibles para esta fecha",
+                                Text("No hay horas disponibles después de las $horaActual",
                                     color = colores.textoSub, fontSize = 13.sp)
                             } else {
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

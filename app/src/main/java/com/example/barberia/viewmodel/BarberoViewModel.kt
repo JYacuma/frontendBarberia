@@ -95,6 +95,16 @@ class BarberoViewModel(
                     r to (usuariosMap[r.idUsuario] ?: "Cliente #${r.idUsuario}")
                 }
 
+                var notificacionesReales = 0
+                for (cita in citas.take(30)) {
+                    cita.idCita?.let { id ->
+                        try {
+                            val r = apiService.getNotificacionesByCita(id)
+                            if (r.isSuccessful) notificacionesReales += (r.body()?.size ?: 0)
+                        } catch (_: Exception) { }
+                    }
+                }
+
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     citasHoy = citas,
@@ -103,7 +113,7 @@ class BarberoViewModel(
                     resenas = resenasList,
                     resenasConCliente = resConCliente,
                     promedio = prom,
-                    notificacionesCount = citas.size,
+                    notificacionesCount = notificacionesReales,
                     todosBloqueos = todosBloqueosList.toList()
                 )
 

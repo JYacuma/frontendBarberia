@@ -66,7 +66,7 @@ fun SuperAdminScreen(
     val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
     val colores = LocalBarberiaColores.current
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {
@@ -81,64 +81,66 @@ fun SuperAdminScreen(
         }
     }
 
+    val initials = remember(nombre) {
+        val ascii = java.text.Normalizer.normalize(nombre, java.text.Normalizer.Form.NFD)
+            .replace(Regex("[^\\p{ASCII}]"), "")
+        ascii.split(" ").take(2).joinToString("") { it.first().uppercase() }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = true,
         drawerContent = {
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                Box(modifier = Modifier.size(52.dp).clip(CircleShape)
-                    .background(SuperAccent),
+            ModalDrawerSheet(drawerContainerColor = colores.superficie) {
+                Box(modifier = Modifier.fillMaxWidth().padding(16.dp),
                     contentAlignment = Alignment.Center) {
-                    Text(getInitials(nombre), color = Color.White,
-                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(modifier = Modifier.size(64.dp).clip(CircleShape)
+                            .background(SuperAccent),
+                            contentAlignment = Alignment.Center) {
+                            Text(initials, color = Color.White,
+                                fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(nombre, fontWeight = FontWeight.Bold, color = colores.texto, fontSize = 16.sp)
+                    }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = colores.borde)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Tema", color = colores.textoSub, fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = TemaManager.modoOscuro.value == false,
-                        onClick = { TemaManager.modoOscuro.value = false },
-                        label = { Text("Claro", fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = SuperAccent,
-                            selectedLabelColor = Color.White)
+                HorizontalDivider()
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.AutoMirrored.Filled.Logout, null, tint = ColorError) },
+                    label = { Text("Cerrar sesión") },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() }; onLogout() }
+                )
+                HorizontalDivider()
+                Text("Tema:", modifier = Modifier.padding(16.dp, 8.dp),
+                    color = colores.textoSub, fontSize = 12.sp)
+                listOf("Claro" to false, "Sistema" to null, "Oscuro" to true).forEach { (label, mode) ->
+                    NavigationDrawerItem(
+                        icon = {
+                            Icon(
+                                imageVector = when (mode) {
+                                    null -> Icons.Filled.BrightnessMedium
+                                    true -> Icons.Filled.DarkMode
+                                    else -> Icons.Filled.LightMode
+                                },
+                                contentDescription = null,
+                                tint = if (TemaManager.modoOscuro.value == mode) SuperAccent
+                                else colores.textoSub
+                            )
+                        },
+                        label = { Text(label) },
+                        selected = TemaManager.modoOscuro.value == mode,
+                        onClick = {
+                            TemaManager.modoOscuro.value = mode
+                            scope.launch { drawerState.close() }
+                        }
                     )
-                    FilterChip(
-                        selected = TemaManager.modoOscuro.value == null,
-                        onClick = { TemaManager.modoOscuro.value = null },
-                        label = { Text("Sistema", fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = SuperAccent,
-                            selectedLabelColor = Color.White)
-                    )
-                    FilterChip(
-                        selected = TemaManager.modoOscuro.value == true,
-                        onClick = { TemaManager.modoOscuro.value = true },
-                        label = { Text("Oscuro", fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = SuperAccent,
-                            selectedLabelColor = Color.White)
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                Button(
-                    onClick = onLogout,
-                    colors = ButtonDefaults.buttonColors(containerColor = ColorError),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Logout, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Cerrar sesión", fontWeight = FontWeight.SemiBold)
                 }
             }
-        },
-        content = {
-            Scaffold(
+        }
+    ) {
+        Scaffold(
                 containerColor = colores.fondo,
                 snackbarHost = {
                     SnackbarHost(snackbarState) { data ->
@@ -161,20 +163,19 @@ fun SuperAdminScreen(
                     userScrollEnabled = true
                 ) { pagina ->
                     when (pagina) {
-                        0 -> SuperInicioTab(nombre, uiState, viewModel,
-                            onLogout, colores,
-                            onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
-                            onNavigateToNotificaciones = onNavigateToNotificaciones,
-                            onOpenDrawer = { scope.launch { drawerState.open() } })
+                         0 -> SuperInicioTab(nombre, uiState, viewModel,
+                             onLogout, colores,
+                             onOpenDrawer = { scope.launch { drawerState.open() } },
+                             onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
+                             onNavigateToNotificaciones = onNavigateToNotificaciones)
                         1 -> SuperUsuariosTab(uiState, viewModel, colores)
                         2 -> SuperBarberosTab(uiState, viewModel, colores)
                         3 -> SuperServiciosTab(uiState, viewModel, colores)
                         4 -> SuperCitasTab(uiState, viewModel, colores)
                     }
                 }
-            }
         }
-    )
+    }
 }
 
 // ── Bottom Bar — 5 tabs, acento dorado ───────────────────────────────────────
@@ -216,6 +217,7 @@ fun SuperAdminBottomBar(
     }
 }
 
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB 0 — INICIO
 // ══════════════════════════════════════════════════════════════════════════════
@@ -227,9 +229,9 @@ fun SuperInicioTab(
     viewModel: SuperAdminViewModel,
     onLogout: () -> Unit,
     colores: BarberiaColores,
+    onOpenDrawer: () -> Unit = {},
     onNavigateToTab: (Int) -> Unit,
-    onNavigateToNotificaciones: () -> Unit = {},
-    onOpenDrawer: () -> Unit = {}
+    onNavigateToNotificaciones: () -> Unit = {}
 ) {
     LazyColumn {
         item {
@@ -244,13 +246,15 @@ fun SuperInicioTab(
                             verticalAlignment = Alignment.Top) {
                             Row(verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Box(modifier = Modifier.size(44.dp).clip(CircleShape)
-                                    .background(SuperAccent.copy(0.15f))
-                                    .border(1.5.dp, SuperAccent, CircleShape)
-                                    .clickable { onOpenDrawer() },
-                                    contentAlignment = Alignment.Center) {
-                                    Text(getInitials(nombre), color = SuperAccent,
-                                        fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Box {
+                                    Box(modifier = Modifier.size(44.dp).clip(CircleShape)
+                                        .background(SuperAccent.copy(0.15f))
+                                        .border(1.5.dp, SuperAccent, CircleShape)
+                                        .clickable { onOpenDrawer() },
+                                        contentAlignment = Alignment.Center) {
+                                        Text(getInitials(nombre), color = SuperAccent,
+                                            fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    }
                                 }
                                 Column {
                                     Row(verticalAlignment = Alignment.CenterVertically,

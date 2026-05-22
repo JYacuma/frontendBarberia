@@ -62,7 +62,7 @@ fun BarberoScreen(
         factory = BarberoViewModel.factory(apiService, idBarbero, idUsuario)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     val pagerState    = rememberPagerState(pageCount = { 4 })
@@ -82,48 +82,67 @@ fun BarberoScreen(
         }
     }
 
+    val initials = remember(nombre) {
+        val ascii = java.text.Normalizer.normalize(nombre, java.text.Normalizer.Form.NFD)
+            .replace(Regex("[^\\p{ASCII}]"), "")
+        ascii.split(" ").take(2).joinToString("") { it.first().uppercase() }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = true,
         drawerContent = {
-            ModalDrawerSheet(modifier = Modifier.fillMaxHeight()) {
-                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                    val initials = getInitials(nombre)
-                    Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(ColorAzul),
-                        contentAlignment = Alignment.Center) {
-                        Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Text(nombre, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = colores.texto)
-                    Text("Barbero", color = ColorAzul, fontSize = 13.sp)
-                    Spacer(Modifier.height(16.dp))
-                    HorizontalDivider()
-                    TextButton(onClick = { scope.launch { drawerState.close() }; onNavigateToPerfil() }) {
-                        Icon(Icons.Filled.Person, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Mi Perfil")
-                    }
-                    HorizontalDivider()
-                    Spacer(Modifier.height(8.dp))
-                    Text("Tema", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = colores.textoSub)
-                    Spacer(Modifier.height(6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        val opciones = listOf("Claro" to false, "Sistema" to null, "Oscuro" to true)
-                        opciones.forEach { (label, valor) ->
-                            FilterChip(
-                                selected = TemaManager.modoOscuro.value == valor,
-                                onClick = { TemaManager.modoOscuro.value = valor },
-                                label = { Text(label, fontSize = 11.sp) }
-                            )
+            ModalDrawerSheet(drawerContainerColor = colores.superficie) {
+                Box(modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(modifier = Modifier.size(64.dp).clip(CircleShape)
+                            .background(ColorAzul),
+                            contentAlignment = Alignment.Center) {
+                            Text(initials, color = Color.White,
+                                fontWeight = FontWeight.Bold, fontSize = 24.sp)
                         }
+                        Spacer(Modifier.height(8.dp))
+                        Text(nombre, fontWeight = FontWeight.Bold, color = colores.texto, fontSize = 16.sp)
                     }
-                    Spacer(Modifier.weight(1f))
-                    Button(onClick = onLogout, colors = ButtonDefaults.buttonColors(containerColor = ColorError),
-                        modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Cerrar sesión")
-                    }
+                }
+                HorizontalDivider()
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Filled.Person, null, tint = ColorAzul) },
+                    label = { Text("Perfil") },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() }; onNavigateToPerfil() }
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.AutoMirrored.Filled.Logout, null, tint = ColorError) },
+                    label = { Text("Cerrar sesión") },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() }; onLogout() }
+                )
+                HorizontalDivider()
+                Text("Tema:", modifier = Modifier.padding(16.dp, 8.dp),
+                    color = colores.textoSub, fontSize = 12.sp)
+                listOf("Claro" to false, "Sistema" to null, "Oscuro" to true).forEach { (label, mode) ->
+                    NavigationDrawerItem(
+                        icon = {
+                            Icon(
+                                imageVector = when (mode) {
+                                    null -> Icons.Filled.BrightnessMedium
+                                    true -> Icons.Filled.DarkMode
+                                    else -> Icons.Filled.LightMode
+                                },
+                                contentDescription = null,
+                                tint = if (TemaManager.modoOscuro.value == mode) ColorAzul
+                                else colores.textoSub
+                            )
+                        },
+                        label = { Text(label) },
+                        selected = TemaManager.modoOscuro.value == mode,
+                        onClick = {
+                            TemaManager.modoOscuro.value = mode
+                            scope.launch { drawerState.close() }
+                        }
+                    )
                 }
             }
         }
@@ -154,9 +173,9 @@ fun BarberoScreen(
                     userScrollEnabled = true
                 ) { pagina ->
                     when (pagina) {
-                        0 -> HoyTab(nombre, uiState, viewModel, colores, onLogout, onNavigateToNotificaciones,
-                            onNavigateToPerfil = onNavigateToPerfil,
-                            onOpenDrawer = { scope.launch { drawerState.open() } })
+                         0 -> HoyTab(nombre, uiState, viewModel, colores, onLogout, onNavigateToNotificaciones,
+                             onNavigateToPerfil = onNavigateToPerfil,
+                             onOpenDrawer = { scope.launch { drawerState.open() } })
                         1 -> AgendaTab(uiState, viewModel, colores)
                         2 -> ResenasBarberoTab(uiState, colores)
                         3 -> HorariosBarberoTab(uiState, colores)
@@ -346,20 +365,22 @@ private fun HoyTab(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                    Box(
-                            modifier = Modifier.size(44.dp).clip(CircleShape)
-                                .background(ColorAzul.copy(0.15f))
-                                .border(1.5.dp, ColorAzul, CircleShape)
-                                .clickable { onOpenDrawer() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = getInitials(nombre),
-                                color = ColorAzul,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
+                    Box {
+                        Box(
+                                modifier = Modifier.size(44.dp).clip(CircleShape)
+                                    .background(ColorAzul.copy(0.15f))
+                                    .border(1.5.dp, ColorAzul, CircleShape)
+                                    .clickable { onOpenDrawer() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = getInitials(nombre),
+                                    color = ColorAzul,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                    }
                         Column {
                             Text(nombre, color = colores.texto, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                             Text("Barbero", color = ColorAzul, fontSize = 12.sp, fontWeight = FontWeight.Medium)

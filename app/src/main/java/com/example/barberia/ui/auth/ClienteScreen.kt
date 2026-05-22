@@ -74,15 +74,20 @@ fun ClienteScreen(
     onNavigateToPerfil: () -> Unit = {}
 ) {
     val viewModel: ClienteViewModel = viewModel(
+        key     = "cliente_$idUsuario",
         factory = ClienteViewModel.factory(apiService, idUsuario)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
     val pagerState    = rememberPagerState(pageCount = { 3 })
     val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
     val colores = LocalBarberiaColores.current
+
+    LaunchedEffect(idUsuario) {
+        if (idUsuario != 0L) viewModel.cargarSiUsuarioValido(idUsuario)
+    }
 
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {
@@ -97,54 +102,67 @@ fun ClienteScreen(
         }
     }
 
+    val initials = remember(nombre) {
+        val ascii = Normalizer.normalize(nombre, Normalizer.Form.NFD)
+            .replace(Regex("[^\\p{ASCII}]"), "")
+        ascii.split(" ").take(2).joinToString("") { it.first().uppercase() }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = true,
         drawerContent = {
-            ModalDrawerSheet(modifier = Modifier.fillMaxHeight()) {
-                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                    val initials = getInitials(nombre)
-                    Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(ColorRojo),
-                        contentAlignment = Alignment.Center) {
-                        Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Text(nombre, color = colores.texto, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(8.dp))
-                    Text("CLIENTE", color = ColorRojo, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                    Divider(color = colores.borde, modifier = Modifier.padding(vertical = 16.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth().clickable { scope.launch { drawerState.close(); onNavigateToPerfil() } }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Person, contentDescription = null, tint = colores.texto)
-                        Spacer(Modifier.width(12.dp))
-                        Text("Perfil", color = colores.texto, fontSize = 16.sp)
-                    }
-
-                    Text("Tema", color = colores.textoSub, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("Claro" to null, "Sistema" to false, "Oscuro" to true).forEach { (label, mode) ->
-                            FilterChip(
-                                selected = TemaManager.modoOscuro.value == mode,
-                                onClick = { TemaManager.modoOscuro.value = mode },
-                                label = { Text(label, fontSize = 12.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ColorRojo.copy(alpha = 0.15f),
-                                    selectedLabelColor = ColorRojo
-                                )
-                            )
+            ModalDrawerSheet(drawerContainerColor = colores.superficie) {
+                Box(modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(modifier = Modifier.size(64.dp).clip(CircleShape)
+                            .background(ColorRojo),
+                            contentAlignment = Alignment.Center) {
+                            Text(initials, color = Color.White,
+                                fontWeight = FontWeight.Bold, fontSize = 24.sp)
                         }
+                        Spacer(Modifier.height(8.dp))
+                        Text(nombre, fontWeight = FontWeight.Bold, color = colores.texto, fontSize = 16.sp)
                     }
-
-                    Spacer(Modifier.height(8.dp))
-                    Divider(color = colores.borde, modifier = Modifier.padding(vertical = 8.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth().clickable { scope.launch { drawerState.close(); onLogout() } }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = ColorRojo)
-                        Spacer(Modifier.width(12.dp))
-                        Text("Cerrar sesión", color = ColorRojo, fontSize = 16.sp)
-                    }
+                }
+                HorizontalDivider()
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Filled.Person, null, tint = ColorRojo) },
+                    label = { Text("Perfil") },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() }; onNavigateToPerfil() }
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.AutoMirrored.Filled.Logout, null, tint = ColorError) },
+                    label = { Text("Cerrar sesión") },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() }; onLogout() }
+                )
+                HorizontalDivider()
+                Text("Tema:", modifier = Modifier.padding(16.dp, 8.dp),
+                    color = colores.textoSub, fontSize = 12.sp)
+                listOf("Claro" to false, "Sistema" to null, "Oscuro" to true).forEach { (label, mode) ->
+                    NavigationDrawerItem(
+                        icon = {
+                            Icon(
+                                imageVector = when (mode) {
+                                    null -> Icons.Filled.BrightnessMedium
+                                    true -> Icons.Filled.DarkMode
+                                    else -> Icons.Filled.LightMode
+                                },
+                                contentDescription = null,
+                                tint = if (TemaManager.modoOscuro.value == mode) ColorRojo
+                                else colores.textoSub
+                            )
+                        },
+                        label = { Text(label) },
+                        selected = TemaManager.modoOscuro.value == mode,
+                        onClick = {
+                            TemaManager.modoOscuro.value = mode
+                            scope.launch { drawerState.close() }
+                        }
+                    )
                 }
             }
         }
@@ -201,16 +219,15 @@ fun ClienteScreen(
             userScrollEnabled = true
         ) { pagina ->
             when (pagina) {
-                0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones,
-                    onNavigateToPerfil = onNavigateToPerfil,
-                    onOpenDrawer = { scope.launch { drawerState.open() } })
+                 0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones,
+                     onNavigateToPerfil = onNavigateToPerfil,
+                     onOpenDrawer = { scope.launch { drawerState.open() } })
                 1 -> AgendarTab(uiState, viewModel, colores)
-        2 -> MisCitasTab(uiState, viewModel, colores)
+                 2 -> MisCitasTab(uiState, viewModel, colores)
             }
         }
     }
-}
-
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -239,13 +256,15 @@ private fun InicioTab(
             modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(modifier = Modifier.size(44.dp).clip(CircleShape)
-                .background(ColorRojo.copy(0.15f))
-                .border(1.5.dp, ColorRojo, CircleShape)
-                .clickable { onOpenDrawer() },
-                contentAlignment = Alignment.Center) {
-                Text(initials, color = ColorRojo,
-                    fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Box {
+                Box(modifier = Modifier.size(44.dp).clip(CircleShape)
+                    .background(ColorRojo.copy(0.15f))
+                    .border(1.5.dp, ColorRojo, CircleShape)
+                    .clickable { onOpenDrawer() },
+                    contentAlignment = Alignment.Center) {
+                    Text(initials, color = ColorRojo,
+                        fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column {
@@ -255,9 +274,10 @@ private fun InicioTab(
             }
             Spacer(Modifier.weight(1f))
             BadgedBox(badge = {
-                if (uiState.notificaciones.isNotEmpty()) {
+                val notisCount = uiState.notificaciones.size
+                if (notisCount > 0) {
                     Badge(containerColor = ColorRojo) {
-                        Text("${uiState.notificaciones.size}",
+                        Text("$notisCount",
                             color = Color.White, fontSize = 10.sp)
                     }
                 }

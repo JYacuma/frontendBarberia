@@ -67,7 +67,7 @@ fun AdminScreen(
 
     val pagerState    = rememberPagerState(pageCount = { 6 })
     val scope         = rememberCoroutineScope()
-    val drawerState   = rememberDrawerState(DrawerValue.Closed)
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val snackbarState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.successMessage) {
@@ -83,107 +83,72 @@ fun AdminScreen(
         }
     }
 
+    val initials = remember(nombre) {
+        val ascii = java.text.Normalizer.normalize(nombre, java.text.Normalizer.Form.NFD)
+            .replace(Regex("[^\\p{ASCII}]"), "")
+        ascii.split(" ").take(2).joinToString("") { it.first().uppercase() }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = true,
         drawerContent = {
-            ModalDrawerSheet {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Box(
-                        modifier = Modifier.size(72.dp).clip(CircleShape).background(AdminAccent),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(getInitials(nombre), color = Color.White,
-                            fontWeight = FontWeight.Bold, fontSize = 24.sp)
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(nombre, color = colores.texto,
-                        fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Spacer(modifier = Modifier.height(24.dp))
-                    HorizontalDivider()
-                    TextButton(
-                        onClick = { onNavigateToPerfil(idUsuario) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Filled.Person, null, tint = AdminAccent,
-                            modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Mi Perfil", color = colores.texto, fontSize = 15.sp)
-                    }
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Tema", color = colores.textoSub,
-                        fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth())
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()) {
-                        FilterChip(
-                            selected = TemaManager.modoOscuro.value == false,
-                            onClick = { TemaManager.modoOscuro.value = false },
-                            label = { Text("Claro", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AdminAccent,
-                                selectedLabelColor = Color.White
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                borderColor = colores.borde,
-                                selectedBorderColor = AdminAccent,
-                                enabled = true,
-                                selected = TemaManager.modoOscuro.value == false
-                            )
-                        )
-                        FilterChip(
-                            selected = TemaManager.modoOscuro.value == null,
-                            onClick = { TemaManager.modoOscuro.value = null },
-                            label = { Text("Sistema", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AdminAccent,
-                                selectedLabelColor = Color.White
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                borderColor = colores.borde,
-                                selectedBorderColor = AdminAccent,
-                                enabled = true,
-                                selected = TemaManager.modoOscuro.value == null
-                            )
-                        )
-                        FilterChip(
-                            selected = TemaManager.modoOscuro.value == true,
-                            onClick = { TemaManager.modoOscuro.value = true },
-                            label = { Text("Oscuro", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AdminAccent,
-                                selectedLabelColor = Color.White
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                borderColor = colores.borde,
-                                selectedBorderColor = AdminAccent,
-                                enabled = true,
-                                selected = TemaManager.modoOscuro.value == true
-                            )
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Button(
-                        onClick = onLogout,
-                        colors = ButtonDefaults.buttonColors(containerColor = ColorError),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, null, tint = Color.White,
-                            modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Cerrar sesión", color = Color.White, fontSize = 15.sp)
+            ModalDrawerSheet(drawerContainerColor = colores.superficie) {
+                Box(modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(modifier = Modifier.size(64.dp).clip(CircleShape)
+                            .background(AdminAccent),
+                            contentAlignment = Alignment.Center) {
+                            Text(initials, color = Color.White,
+                                fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(nombre, fontWeight = FontWeight.Bold, color = colores.texto, fontSize = 16.sp)
                     }
                 }
+                HorizontalDivider()
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Filled.Person, null, tint = AdminAccent) },
+                    label = { Text("Perfil") },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() } }
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.AutoMirrored.Filled.Logout, null, tint = ColorError) },
+                    label = { Text("Cerrar sesión") },
+                    selected = false,
+                    onClick = { scope.launch { drawerState.close() }; onLogout() }
+                )
+                HorizontalDivider()
+                Text("Tema:", modifier = Modifier.padding(16.dp, 8.dp),
+                    color = colores.textoSub, fontSize = 12.sp)
+                listOf("Claro" to false, "Sistema" to null, "Oscuro" to true).forEach { (label, mode) ->
+                    NavigationDrawerItem(
+                        icon = {
+                            Icon(
+                                imageVector = when (mode) {
+                                    null -> Icons.Filled.BrightnessMedium
+                                    true -> Icons.Filled.DarkMode
+                                    else -> Icons.Filled.LightMode
+                                },
+                                contentDescription = null,
+                                tint = if (TemaManager.modoOscuro.value == mode) AdminAccent
+                                else colores.textoSub
+                            )
+                        },
+                        label = { Text(label) },
+                        selected = TemaManager.modoOscuro.value == mode,
+                        onClick = {
+                            TemaManager.modoOscuro.value = mode
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                }
             }
-        },
-        content = {
-            Scaffold(
+        }
+    ) {
+        Scaffold(
                 containerColor = colores.fondo,
                 snackbarHost = {
                     SnackbarHost(snackbarState) { data ->
@@ -206,11 +171,11 @@ fun AdminScreen(
                     userScrollEnabled = true
                 ) { pagina ->
                     when (pagina) {
-                        0 -> AdminInicioTab(nombre, uiState, viewModel,
-                            onLogout, colores,
-                            drawerState = drawerState,
-                            onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
-                            onNavigateToNotificaciones = onNavigateToNotificaciones)
+                         0 -> AdminInicioTab(nombre, uiState, viewModel,
+                             onLogout, colores,
+                             onOpenDrawer = { scope.launch { drawerState.open() } },
+                             onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
+                             onNavigateToNotificaciones = onNavigateToNotificaciones)
                         1 -> AdminCitasTab(uiState, viewModel, colores)
                         2 -> AdminBarberosTab(uiState, viewModel, colores)
                         3 -> AdminServiciosTab(uiState, viewModel, colores)
@@ -218,9 +183,8 @@ fun AdminScreen(
                         5 -> AdminResenasTab(uiState, viewModel, colores)
                     }
                 }
-            }
         }
-    )
+    }
 }
 
 // ── Bottom Bar ──────────────────────────────────────────────────────────────
@@ -274,7 +238,7 @@ private fun AdminInicioTab(
     viewModel: AdminViewModel,
     onLogout: () -> Unit,
     colores: BarberiaColores,
-    drawerState: DrawerState,
+    onOpenDrawer: () -> Unit = {},
     onNavigateToTab: (Int) -> Unit,
     onNavigateToNotificaciones: () -> Unit = {}
 ) {
@@ -312,13 +276,15 @@ private fun AdminInicioTab(
                             verticalAlignment = Alignment.Top) {
                             Row(verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Box(modifier = Modifier.size(44.dp).clip(CircleShape)
-                                    .background(AdminAccent.copy(0.15f))
-                                    .border(1.5.dp, AdminAccent, CircleShape)
-                                    .clickable { scope.launch { drawerState.open() } },
-                                    contentAlignment = Alignment.Center) {
-                                    Text(getInitials(nombre), color = AdminAccent,
-                                        fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Box {
+                                    Box(modifier = Modifier.size(44.dp).clip(CircleShape)
+                                        .background(AdminAccent.copy(0.15f))
+                                        .border(1.5.dp, AdminAccent, CircleShape)
+                                        .clickable { onOpenDrawer() },
+                                        contentAlignment = Alignment.Center) {
+                                        Text(getInitials(nombre), color = AdminAccent,
+                                            fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    }
                                 }
                                 Column {
                                     Row(verticalAlignment = Alignment.CenterVertically,

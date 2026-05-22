@@ -90,6 +90,16 @@ class AdminViewModel(
 
                 val citasHoyList = todasLasCitas.filter { it.fecha == fechaHoy }
 
+                var notificacionesReales = 0
+                for (cita in todasLasCitas.take(50)) {
+                    cita.idCita?.let { id ->
+                        try {
+                            val r = apiService.getNotificacionesByCita(id)
+                            if (r.isSuccessful) notificacionesReales += (r.body()?.size ?: 0)
+                        } catch (_: Exception) { }
+                    }
+                }
+
                 _uiState.value = _uiState.value.copy(
                     isLoading            = false,
                     todasLasCitas        = todasLasCitas,
@@ -100,7 +110,7 @@ class AdminViewModel(
                     serviciosConDetalle  = serviciosConDetalle,
                     usuariosBarbero      = usuariosBarbero,
                     todosUsuarios        = todosUsuarios,
-                    notificacionesCount  = citasHoyList.size
+                    notificacionesCount  = notificacionesReales
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(

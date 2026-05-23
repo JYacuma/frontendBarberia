@@ -384,26 +384,32 @@ private fun AdminCitasTab(
     val citasFiltradas = if (filtroEstado == null) uiState.citasConDetalles
     else uiState.citasConDetalles.filter { it.cita.estado == filtroEstado }
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.cargarDatosIniciales()
-            isRefreshing = false
-        }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
+            )))
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                viewModel.cargarDatosIniciales()
+                isRefreshing = false
+            },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                Text("Todas las citas", color = colores.texto,
-                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("${uiState.todasLasCitas.size} citas en total",
-                    color = colores.textoSub, fontSize = 13.sp)
-            }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text("Todas las citas", color = colores.texto,
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("${uiState.todasLasCitas.size} citas en total",
+                        color = colores.textoSub, fontSize = 13.sp)
+                }
 
             item {
                 var expanded by remember { mutableStateOf(false) }
@@ -480,6 +486,7 @@ private fun AdminCitasTab(
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
+    }
     }
 
     citaACancelar?.let { detalle ->
@@ -577,44 +584,50 @@ private fun AdminBarberosTab(
     var editIdUsuario      by remember { mutableStateOf<Long?>(null) }
     var isRefreshing       by remember { mutableStateOf(false) }
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.cargarDatosIniciales()
-            isRefreshing = false
-        }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
+            )))
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                viewModel.cargarDatosIniciales()
+                isRefreshing = false
+            },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                Row(modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("Barberos", color = colores.texto,
-                            fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("${uiState.barberos.size} registrados",
-                            color = colores.textoSub, fontSize = 13.sp)
-                    }
-                    FloatingActionButton(
-                        onClick = { mostrarFormulario = !mostrarFormulario },
-                        containerColor = AdminAccent,
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
-                            null, tint = Color.White, modifier = Modifier.size(20.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("Barberos", color = colores.texto,
+                                fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text("${uiState.barberos.size} registrados",
+                                color = colores.textoSub, fontSize = 13.sp)
+                        }
+                        FloatingActionButton(
+                            onClick = { mostrarFormulario = !mostrarFormulario },
+                            containerColor = AdminAccent,
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
+                                null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
-            }
 
             item {
-                Box {
+                Column {
                     AnimatedVisibility(
                         visible = mostrarFormulario,
                         enter   = expandVertically() + fadeIn(),
@@ -721,6 +734,7 @@ private fun AdminBarberosTab(
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
+    }
     }
 
     barberoAEliminar?.let { barbero ->
@@ -862,41 +876,47 @@ private fun AdminServiciosTab(
 
     LaunchedEffect(uiState.serviciosConDetalle) { }
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.cargarDatosIniciales()
-            isRefreshing = false
-        }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
+            )))
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                viewModel.cargarDatosIniciales()
+                isRefreshing = false
+            },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                Row(modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("Servicios", color = colores.texto,
-                            fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("${uiState.servicios.size} servicios",
-                            color = colores.textoSub, fontSize = 13.sp)
-                    }
-                    FloatingActionButton(
-                        onClick = { mostrarFormulario = !mostrarFormulario },
-                        containerColor = ColorVerde,
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
-                            null, tint = Color.White, modifier = Modifier.size(20.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("Servicios", color = colores.texto,
+                                fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text("${uiState.servicios.size} servicios",
+                                color = colores.textoSub, fontSize = 13.sp)
+                        }
+                        FloatingActionButton(
+                            onClick = { mostrarFormulario = !mostrarFormulario },
+                            containerColor = ColorVerde,
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
+                                null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
-            }
 
             item {
                 var expanded by remember { mutableStateOf(false) }
@@ -926,7 +946,7 @@ private fun AdminServiciosTab(
             }
 
             item {
-                Box {
+                Column {
                 AnimatedVisibility(
                     visible = mostrarFormulario,
                     enter   = expandVertically() + fadeIn(),
@@ -1009,6 +1029,7 @@ private fun AdminServiciosTab(
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
+    }
     }
 
     servicioDetalle?.let { det ->
@@ -1133,29 +1154,35 @@ private fun AdminHorariosTab(
     var horaFinCustom     by remember { mutableStateOf("19:00") }
     var usarHorarioCustom by remember { mutableStateOf(false) }
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            uiState.barberoSeleccionado?.let {
-                viewModel.cargarHorarios(it.idBarbero!!)
-            }
-            viewModel.cargarDatosIniciales()
-            isRefreshing = false
-        }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
+            )))
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                uiState.barberoSeleccionado?.let {
+                    viewModel.cargarHorarios(it.idBarbero!!)
+                }
+                viewModel.cargarDatosIniciales()
+                isRefreshing = false
+            },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Horarios", color = colores.texto,
-                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("Selecciona un barbero para gestionar sus horarios",
-                    color = colores.textoSub, fontSize = 13.sp)
-            }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Horarios", color = colores.texto,
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("Selecciona un barbero para gestionar sus horarios",
+                        color = colores.textoSub, fontSize = 13.sp)
+                }
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1441,6 +1468,7 @@ private fun AdminHorariosTab(
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
     }
+    }
 
     horarioAEliminar?.let { horario ->
         AlertDialog(
@@ -1574,44 +1602,50 @@ private fun AdminResenasTab(
     val resenasFiltradas = if (barberoFiltroResena == null) uiState.resenas
     else uiState.resenas.filter { it.idBarbero == barberoFiltroResena!!.idBarbero }
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.cargarResenas()
-            isRefreshing = false
-        }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
+            )))
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                viewModel.cargarResenas()
+                isRefreshing = false
+            },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                Row(modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("Reseñas", color = colores.texto,
-                            fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        if (barberoFiltroResena != null) {
-                            TextButton(onClick = { barberoFiltroResena = null }) {
-                                Icon(Icons.Filled.ArrowBack, null,
-                                    tint = AdminAccent, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Ver todas", color = AdminAccent, fontSize = 12.sp)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("Reseñas", color = colores.texto,
+                                fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            if (barberoFiltroResena != null) {
+                                TextButton(onClick = { barberoFiltroResena = null }) {
+                                    Icon(Icons.Filled.ArrowBack, null,
+                                        tint = AdminAccent, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Ver todas", color = AdminAccent, fontSize = 12.sp)
+                                }
                             }
                         }
-                    }
-                    TextButton(onClick = { viewModel.cargarResenas() }) {
-                        Icon(Icons.Filled.Refresh, null,
-                            tint = AdminAccent, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Actualizar", color = AdminAccent, fontSize = 12.sp)
+                        TextButton(onClick = { viewModel.cargarResenas() }) {
+                            Icon(Icons.Filled.Refresh, null,
+                                tint = AdminAccent, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Actualizar", color = AdminAccent, fontSize = 12.sp)
+                        }
                     }
                 }
-            }
 
             if (barberoFiltroResena == null) {
                 item {
@@ -1765,6 +1799,7 @@ private fun AdminResenasTab(
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
+    }
     }
 
     resenaSeleccionada?.let { resena ->

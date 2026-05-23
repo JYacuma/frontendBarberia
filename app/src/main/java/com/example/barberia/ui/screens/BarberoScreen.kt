@@ -671,115 +671,120 @@ private fun AgendaTab(
         blocks
     }
 
-    PullToRefreshBox(
-        isRefreshing = uiState.isLoading,
-        onRefresh = { viewModel.cargarDatosIniciales() },
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(modifier = Modifier.fillMaxSize().background(colores.fondo)) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
+            )))
+        PullToRefreshBox(
+            isRefreshing = uiState.isLoading,
+            onRefresh = { viewModel.cargarDatosIniciales() },
+            modifier = Modifier.weight(1f)
         ) {
-            Text("Agenda", color = colores.texto, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-
-            Button(
-                onClick = { showDialog = true },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = ColorAzul)
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Filled.Lock, null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Organizar descanso", fontWeight = FontWeight.SemiBold)
-            }
+                Text("Agenda", color = colores.texto, fontSize = 22.sp, fontWeight = FontWeight.Bold)
 
-            if (showDialog) {
-                AlertDialog(
-                    onDismissRequest = { showDialog = false; selectedDay = null; selectedBlock = null },
-                    containerColor = colores.superficie,
-                    shape = RoundedCornerShape(20.dp),
-                    title = {
-                        Text("Selecciona día y bloque de descanso",
-                            color = colores.texto, fontWeight = FontWeight.Bold)
-                    },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Día", color = colores.texto, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                listOf("LUNES","MARTES","MIERCOLES","JUEVES","VIERNES","SABADO","DOMINGO").forEach { dia ->
-                                    FilterChip(
-                                        selected = selectedDay == dia,
-                                        onClick = { selectedDay = if (selectedDay == dia) null else dia },
-                                        label = { Text(dia.take(3), fontSize = 11.sp) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = ColorAzul, selectedLabelColor = Color.White
-                                        )
-                                    )
-                                }
-                            }
-                            if (selectedDay != null) {
-                                Text("Bloque", color = colores.texto, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                val chunks = bloques30.chunked(4)
-                                chunks.forEach { row ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                                        row.forEach { bloque ->
-                                            FilterChip(
-                                                selected = selectedBlock == bloque,
-                                                onClick = { selectedBlock = if (selectedBlock == bloque) null else bloque },
-                                                label = { Text(bloque, fontSize = 10.sp) },
-                                                colors = FilterChipDefaults.filterChipColors(
-                                                    selectedContainerColor = ColorAzul, selectedLabelColor = Color.White
-                                                )
+                Button(
+                    onClick = { showDialog = true },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ColorAzul)
+                ) {
+                    Icon(Icons.Filled.Lock, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Organizar descanso", fontWeight = FontWeight.SemiBold)
+                }
+    
+                if (showDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDialog = false; selectedDay = null; selectedBlock = null },
+                        containerColor = colores.superficie,
+                        shape = RoundedCornerShape(20.dp),
+                        title = {
+                            Text("Selecciona día y bloque de descanso",
+                                color = colores.texto, fontWeight = FontWeight.Bold)
+                        },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text("Día", color = colores.texto, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                    listOf("LUNES","MARTES","MIERCOLES","JUEVES","VIERNES","SABADO","DOMINGO").forEach { dia ->
+                                        FilterChip(
+                                            selected = selectedDay == dia,
+                                            onClick = { selectedDay = if (selectedDay == dia) null else dia },
+                                            label = { Text(dia.take(3), fontSize = 11.sp) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = ColorAzul, selectedLabelColor = Color.White
                                             )
+                                        )
+                                    }
+                                }
+                                if (selectedDay != null) {
+                                    Text("Bloque", color = colores.texto, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                    val chunks = bloques30.chunked(4)
+                                    chunks.forEach { row ->
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                                            row.forEach { bloque ->
+                                                FilterChip(
+                                                    selected = selectedBlock == bloque,
+                                                    onClick = { selectedBlock = if (selectedBlock == bloque) null else bloque },
+                                                    label = { Text(bloque, fontSize = 10.sp) },
+                                                    colors = FilterChipDefaults.filterChipColors(
+                                                        selectedContainerColor = ColorAzul, selectedLabelColor = Color.White
+                                                    )
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                selectedDay?.let { d ->
-                                    selectedBlock?.let { b ->
-                                        viewModel.guardarBloqueoDescanso(d, b)
-                                        showDialog = false; selectedDay = null; selectedBlock = null
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    selectedDay?.let { d ->
+                                        selectedBlock?.let { b ->
+                                            viewModel.guardarBloqueoDescanso(d, b)
+                                            showDialog = false; selectedDay = null; selectedBlock = null
+                                        }
                                     }
-                                }
-                            },
-                            enabled = selectedDay != null && selectedBlock != null
+                                },
+                                enabled = selectedDay != null && selectedBlock != null
+                            ) {
+                                Text("Guardar", color = ColorAzul)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDialog = false; selectedDay = null; selectedBlock = null }) {
+                                Text("Cancelar", color = colores.textoSub)
+                            }
+                        }
+                    )
+                }
+    
+                HorizontalDivider(color = colores.borde)
+    
+                Text("Mis citas de hoy", color = colores.texto, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+    
+                if (uiState.citasConDetalle.isEmpty()) {
+                    Text("Sin citas para hoy", color = colores.textoSub, fontSize = 14.sp)
+                } else {
+                    uiState.citasConDetalle.forEach { detalle ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = colores.superficie)
                         ) {
-                            Text("Guardar", color = ColorAzul)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showDialog = false; selectedDay = null; selectedBlock = null }) {
-                            Text("Cancelar", color = colores.textoSub)
-                        }
-                    }
-                )
-            }
-
-            HorizontalDivider(color = colores.borde)
-
-            Text("Mis citas de hoy", color = colores.texto, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-
-            if (uiState.citasConDetalle.isEmpty()) {
-                Text("Sin citas para hoy", color = colores.textoSub, fontSize = 14.sp)
-            } else {
-                uiState.citasConDetalle.forEach { detalle ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = colores.superficie)
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(detalle.cita.horaInicio?.take(5) ?: "--:--",
-                                color = ColorAzul, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Column {
-                                Text(detalle.clienteNombre, color = colores.texto, fontWeight = FontWeight.Medium)
-                                Text(detalle.servicioNombre, color = colores.textoSub, fontSize = 12.sp)
+                            Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text(detalle.cita.horaInicio?.take(5) ?: "--:--",
+                                    color = ColorAzul, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Column {
+                                    Text(detalle.clienteNombre, color = colores.texto, fontWeight = FontWeight.Medium)
+                                    Text(detalle.servicioNombre, color = colores.textoSub, fontSize = 12.sp)
+                                }
                             }
                         }
                     }
@@ -801,86 +806,92 @@ private fun ResenasBarberoTab(
         uiState.resenasConCliente.groupBy({ it.second }, { it.first })
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("Reseñas", color = colores.texto,
-                fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        }
-
-        item {
-            Card(modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = colores.superficie),
-                elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
-                Column {
-                    Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                        Brush.horizontalGradient(listOf(ColorDorado, ColorDorado.copy(0.3f)))))
-                    Row(modifier = Modifier.padding(20.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Column {
-                            Text("Promedio", color = colores.textoSub,
-                                fontSize = 12.sp, letterSpacing = 1.sp)
-                            Row(verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("%.1f".format(uiState.promedio), color = ColorDorado,
-                                    fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                                Icon(Icons.Filled.Star, null,
-                                    tint = ColorDorado, modifier = Modifier.size(28.dp))
-                            }
-                            Text("${uiState.resenas.size} reseña${if (uiState.resenas.size != 1) "s" else ""}",
-                                color = colores.textoSub, fontSize = 12.sp)
-                        }
-                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            (5 downTo 1).forEach { estrellas ->
-                                val cant = uiState.resenas.count {
-                                    it.calificacion == estrellas }
+    Column(modifier = Modifier.fillMaxSize().background(colores.fondo)) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
+            )))
+        LazyColumn(
+            modifier = Modifier.weight(1f)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(20.dp))
+                Text("Reseñas", color = colores.texto,
+                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            }
+    
+            item {
+                Card(modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = colores.superficie),
+                    elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+                    Column {
+                        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+                            Brush.horizontalGradient(listOf(ColorDorado, ColorDorado.copy(0.3f)))))
+                        Row(modifier = Modifier.padding(20.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Column {
+                                Text("Promedio", color = colores.textoSub,
+                                    fontSize = 12.sp, letterSpacing = 1.sp)
                                 Row(verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text("$estrellas", color = colores.textoSub, fontSize = 11.sp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("%.1f".format(uiState.promedio), color = ColorDorado,
+                                        fontSize = 36.sp, fontWeight = FontWeight.Bold)
                                     Icon(Icons.Filled.Star, null,
-                                        tint = ColorDorado, modifier = Modifier.size(12.dp))
-                                    Text("$cant", color = colores.texto, fontSize = 11.sp)
+                                        tint = ColorDorado, modifier = Modifier.size(28.dp))
+                                }
+                                Text("${uiState.resenas.size} reseña${if (uiState.resenas.size != 1) "s" else ""}",
+                                    color = colores.textoSub, fontSize = 12.sp)
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                (5 downTo 1).forEach { estrellas ->
+                                    val cant = uiState.resenas.count {
+                                        it.calificacion == estrellas }
+                                    Row(verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text("$estrellas", color = colores.textoSub, fontSize = 11.sp)
+                                        Icon(Icons.Filled.Star, null,
+                                            tint = ColorDorado, modifier = Modifier.size(12.dp))
+                                        Text("$cant", color = colores.texto, fontSize = 11.sp)
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-
-        if (grouped.isEmpty()) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().height(180.dp),
-                    contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Filled.StarOutline, null,
-                            tint = colores.textoSub, modifier = Modifier.size(48.dp))
-                        Text("Sin reseñas aún",
-                            color = colores.textoSub, fontSize = 15.sp)
+    
+            if (grouped.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().height(180.dp),
+                        contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Filled.StarOutline, null,
+                                tint = colores.textoSub, modifier = Modifier.size(48.dp))
+                            Text("Sin reseñas aún",
+                                color = colores.textoSub, fontSize = 15.sp)
+                        }
+                    }
+                }
+            } else {
+                grouped.forEach { (cliente, resenas) ->
+                    item {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(cliente, color = ColorAzul, fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                    items(resenas) { resena ->
+                        TarjetaResenaBarbero(resena, colores, cliente)
                     }
                 }
             }
-        } else {
-            grouped.forEach { (cliente, resenas) ->
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(cliente, color = ColorAzul, fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-                items(resenas) { resena ->
-                    TarjetaResenaBarbero(resena, colores, cliente)
-                }
-            }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
-        item { Spacer(modifier = Modifier.height(20.dp)) }
     }
 }
 
@@ -916,83 +927,89 @@ private fun HorariosBarberoTab(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colores.fondo)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("Horarios", color = colores.texto, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        }
-
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                items(diasSemana) { dia ->
-                    val seleccionado = selectedDay == dia
-                    FilterChip(
-                        selected = seleccionado,
-                        onClick = { selectedDay = if (seleccionado) null else dia },
-                        label = { Text(dia.take(3), fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = ColorAzul,
-                            selectedLabelColor = Color.White
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            borderColor = if (seleccionado) ColorAzul else colores.borde,
-                            selectedBorderColor = ColorAzul,
-                            enabled = true,
-                            selected = seleccionado
-                        )
-                    )
-                }
+    Column(modifier = Modifier.fillMaxSize().background(colores.fondo)) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
+            )))
+        LazyColumn(
+            modifier = Modifier.weight(1f)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(20.dp))
+                Text("Horarios", color = colores.texto, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             }
-        }
 
-        if (selectedDay != null) {
-            if (citasFiltradas.isEmpty()) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().height(160.dp),
-                        contentAlignment = Alignment.Center) {
-                        Text("Sin citas para este día", color = colores.textoSub, fontSize = 15.sp)
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    items(diasSemana) { dia ->
+                        val seleccionado = selectedDay == dia
+                        FilterChip(
+                            selected = seleccionado,
+                            onClick = { selectedDay = if (seleccionado) null else dia },
+                            label = { Text(dia.take(3), fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = ColorAzul,
+                                selectedLabelColor = Color.White
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = if (seleccionado) ColorAzul else colores.borde,
+                                selectedBorderColor = ColorAzul,
+                                enabled = true,
+                                selected = seleccionado
+                            )
+                        )
                     }
                 }
-            } else {
-                items(citasFiltradas) { cita ->
-                    val detalle = uiState.citasConDetalle.find { it.cita.idCita == cita.idCita }
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = colores.superficie)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+            }
+    
+            if (selectedDay != null) {
+                if (citasFiltradas.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().height(160.dp),
+                            contentAlignment = Alignment.Center) {
+                            Text("Sin citas para este día", color = colores.textoSub, fontSize = 15.sp)
+                        }
+                    }
+                } else {
+                    items(citasFiltradas) { cita ->
+                        val detalle = uiState.citasConDetalle.find { it.cita.idCita == cita.idCita }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = colores.superficie)
                         ) {
-                            Column {
-                                Text(cita.horaInicio?.take(5) ?: "--:--",
-                                    color = ColorAzul, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text(cita.horaFin?.take(5) ?: "--:--",
-                                    color = colores.textoSub, fontSize = 12.sp)
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    detalle?.clienteNombre ?: "Cliente #${cita.idUsuario}",
-                                    color = colores.texto, fontWeight = FontWeight.Medium, fontSize = 14.sp
-                                )
-                                Text(
-                                    detalle?.servicioNombre ?: "Servicio #${cita.idServicio}",
-                                    color = colores.textoSub, fontSize = 12.sp
-                                )
+                            Row(
+                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(cita.horaInicio?.take(5) ?: "--:--",
+                                        color = ColorAzul, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text(cita.horaFin?.take(5) ?: "--:--",
+                                        color = colores.textoSub, fontSize = 12.sp)
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        detalle?.clienteNombre ?: "Cliente #${cita.idUsuario}",
+                                        color = colores.texto, fontWeight = FontWeight.Medium, fontSize = 14.sp
+                                    )
+                                    Text(
+                                        detalle?.servicioNombre ?: "Servicio #${cita.idServicio}",
+                                        color = colores.textoSub, fontSize = 12.sp
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+    
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
-
-        item { Spacer(modifier = Modifier.height(20.dp)) }
     }
 }
 

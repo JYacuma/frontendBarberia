@@ -718,17 +718,23 @@ private fun AgendarTab(
         )
     }
 
-    PullToRefreshBox(
-        isRefreshing = uiState.isLoading,
-        onRefresh = { viewModel.cargarDatosIniciales() }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
+            )))
+        PullToRefreshBox(
+            isRefreshing = uiState.isLoading,
+            onRefresh = { viewModel.cargarDatosIniciales() },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
                 Text("Agendar Cita", color = colores.texto,
                     fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text("Sigue los pasos para reservar", color = colores.textoSub, fontSize = 13.sp)
@@ -1000,6 +1006,7 @@ private fun AgendarTab(
             }
         }
     }
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1236,17 +1243,23 @@ private fun MisCitasTab(
         )
     }
 
-    PullToRefreshBox(
-        isRefreshing = uiState.isLoading,
-        onRefresh = { viewModel.cargarDatosIniciales() }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
+            )))
+        PullToRefreshBox(
+            isRefreshing = uiState.isLoading,
+            onRefresh = { viewModel.cargarDatosIniciales() },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
                 Text("Mis Citas", color = colores.texto,
                     fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
@@ -1313,6 +1326,7 @@ private fun MisCitasTab(
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
+    }
     }
 }
 

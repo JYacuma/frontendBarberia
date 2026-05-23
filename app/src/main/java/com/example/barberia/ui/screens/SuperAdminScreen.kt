@@ -396,43 +396,49 @@ fun SuperUsuariosTab(
     val usuariosFiltrados = if (filtroRol == null) uiState.usuarios
     else uiState.usuarios.filter { it.rol == filtroRol }
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.cargarDatosIniciales()
-            isRefreshing = false
-        }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
+            )))
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                viewModel.cargarDatosIniciales()
+                isRefreshing = false
+            },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                Row(modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("Usuarios", color = colores.texto,
-                            fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("${uiState.usuarios.size} usuarios registrados",
-                            color = colores.textoSub, fontSize = 13.sp)
-                    }
-                    FloatingActionButton(
-                        onClick = { mostrarFormulario = !mostrarFormulario },
-                        containerColor = SuperAccent,
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
-                            null, tint = Color.White, modifier = Modifier.size(20.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("Usuarios", color = colores.texto,
+                                fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text("${uiState.usuarios.size} usuarios registrados",
+                                color = colores.textoSub, fontSize = 13.sp)
+                        }
+                        FloatingActionButton(
+                            onClick = { mostrarFormulario = !mostrarFormulario },
+                            containerColor = SuperAccent,
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
+                                null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
-            }
 
             item {
-                Box {
+                Column {
                     AnimatedVisibility(mostrarFormulario,
                         enter = expandVertically() + fadeIn(),
                         exit  = shrinkVertically() + fadeOut()) {
@@ -575,6 +581,7 @@ fun SuperUsuariosTab(
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
     }
+    }
 
     usuarioAEliminar?.let { usuario ->
         AlertDialog(
@@ -703,40 +710,46 @@ fun SuperBarberosTab(
         it.rol == RolEnum.BARBERO && it.activo == true
     }
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.cargarDatosIniciales()
-            isRefreshing = false
-        }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
+            )))
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                viewModel.cargarDatosIniciales()
+                isRefreshing = false
+            },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                Row(modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("Barberos", color = colores.texto,
-                            fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("${uiState.barberos.size} registrados",
-                            color = colores.textoSub, fontSize = 13.sp)
-                    }
-                    FloatingActionButton(onClick = { mostrarFormulario = !mostrarFormulario },
-                        containerColor = SuperAccent, modifier = Modifier.size(44.dp)) {
-                        Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
-                            null, tint = Color.White, modifier = Modifier.size(20.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("Barberos", color = colores.texto,
+                                fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text("${uiState.barberos.size} registrados",
+                                color = colores.textoSub, fontSize = 13.sp)
+                        }
+                        FloatingActionButton(onClick = { mostrarFormulario = !mostrarFormulario },
+                            containerColor = SuperAccent, modifier = Modifier.size(44.dp)) {
+                            Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
+                                null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
-            }
 
             item {
-                Box {
+                Column {
                     AnimatedVisibility(mostrarFormulario,
                         enter = expandVertically() + fadeIn(),
                         exit  = shrinkVertically() + fadeOut()) {
@@ -839,6 +852,7 @@ fun SuperBarberosTab(
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
+    }
     }
 
     barberoAEliminar?.let { barbero ->
@@ -978,37 +992,43 @@ fun SuperServiciosTab(
         else -> uiState.servicios
     }
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.cargarDatosIniciales()
-            isRefreshing = false
-        }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
+            )))
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                viewModel.cargarDatosIniciales()
+                isRefreshing = false
+            },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                Row(modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("Servicios", color = colores.texto,
-                            fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("${uiState.servicios.size} servicios",
-                            color = colores.textoSub, fontSize = 13.sp)
-                    }
-                    FloatingActionButton(onClick = { mostrarFormulario = !mostrarFormulario },
-                        containerColor = SuperAccent, modifier = Modifier.size(44.dp)) {
-                        Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
-                            null, tint = Color.White, modifier = Modifier.size(20.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("Servicios", color = colores.texto,
+                                fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text("${uiState.servicios.size} servicios",
+                                color = colores.textoSub, fontSize = 13.sp)
+                        }
+                        FloatingActionButton(onClick = { mostrarFormulario = !mostrarFormulario },
+                            containerColor = SuperAccent, modifier = Modifier.size(44.dp)) {
+                            Icon(if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
+                                null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
-            }
 
             item {
                 var expanded by remember { mutableStateOf(false) }
@@ -1048,7 +1068,7 @@ fun SuperServiciosTab(
             }
 
             item {
-                Box {
+                Column {
                     AnimatedVisibility(mostrarFormulario,
                         enter = expandVertically() + fadeIn(),
                         exit  = shrinkVertically() + fadeOut()) {
@@ -1128,6 +1148,7 @@ fun SuperServiciosTab(
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
+    }
     }
 
     servicioDetalle?.let { det ->
@@ -1252,26 +1273,32 @@ fun SuperCitasTab(
     val citasFiltradas = if (filtroEstado == null) uiState.citasConDetalles
     else uiState.citasConDetalles.filter { it.cita.estado == filtroEstado }
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.cargarDatosIniciales()
-            isRefreshing = false
-        }
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().background(colores.fondo)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+            Brush.horizontalGradient(
+                listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
+            )))
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                viewModel.cargarDatosIniciales()
+                isRefreshing = false
+            },
+            modifier = Modifier.weight(1f)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                Text("Todas las citas", color = colores.texto,
-                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("${uiState.todasLasCitas.size} citas · ${uiState.citasHoy.size} hoy",
-                    color = colores.textoSub, fontSize = 13.sp)
-            }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(colores.fondo)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text("Todas las citas", color = colores.texto,
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("${uiState.todasLasCitas.size} citas · ${uiState.citasHoy.size} hoy",
+                        color = colores.textoSub, fontSize = 13.sp)
+                }
 
             item {
                 var expanded by remember { mutableStateOf(false) }
@@ -1352,6 +1379,7 @@ fun SuperCitasTab(
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
+    }
     }
 
     citaACancelar?.let { detalle ->

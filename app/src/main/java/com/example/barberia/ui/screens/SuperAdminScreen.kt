@@ -1517,49 +1517,64 @@ fun TarjetaUsuarioSuper(
         RolEnum.CLIENTE       -> ColorRojo
         null                  -> colores.textoSub
     }
+    val textoRol = when (usuario.rol) {
+        RolEnum.SUPERADMIN    -> "Super Administrador"
+        RolEnum.ADMINISTRADOR -> "Administrador"
+        RolEnum.BARBERO       -> "Barbero"
+        RolEnum.CLIENTE       -> "Cliente"
+        null                  -> "Desconocido"
+    }
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
-        Row(modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(modifier = Modifier.size(42.dp).clip(CircleShape)
-                .background(colorRol.copy(0.15f)),
-                contentAlignment = Alignment.Center) {
-                Text(getInitials(usuario.nombre ?: "").take(2),
-                    color = colorRol, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Box(modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(colorRol)
+                .padding(horizontal = 8.dp, vertical = 2.dp)) {
+                Text(textoRol, color = Color.White,
+                    fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(usuario.nombre ?: "Sin nombre", color = colores.texto,
-                        fontWeight = FontWeight.Medium, fontSize = 14.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Box(modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(colorRol.copy(0.15f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)) {
-                        Text(usuario.rol?.name ?: "", color = colorRol,
-                            fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(usuario.nombre ?: "Sin nombre", color = colores.texto,
+                fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(usuario.correo ?: "", color = colores.textoSub,
+                fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onEditar,
+                        modifier = Modifier.height(32.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = SuperAccent),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Filled.Edit, null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Editar", fontSize = 11.sp)
+                    }
+                    Button(
+                        onClick = onEliminar,
+                        modifier = Modifier.height(32.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ColorError),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Filled.DeleteOutline, null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Eliminar", fontSize = 11.sp)
                     }
                 }
-                Text(usuario.correo ?: "", color = colores.textoSub,
-                    fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Switch(checked = usuario.activo ?: false,
-                onCheckedChange = { onToggle() },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor   = Color.White,
-                    checkedTrackColor   = SuperAccent,
-                    uncheckedThumbColor = Color.White,
-                    uncheckedTrackColor = colores.borde))
-            IconButton(onClick = onEditar, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.Edit, null,
-                    tint = SuperAccent, modifier = Modifier.size(16.dp))
-            }
-            IconButton(onClick = onEliminar, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.DeleteOutline, null,
-                    tint = ColorError, modifier = Modifier.size(18.dp))
+                Switch(checked = usuario.activo ?: false,
+                    onCheckedChange = { onToggle() },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor   = Color.White,
+                        checkedTrackColor   = SuperAccent,
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = colores.borde))
             }
         }
     }

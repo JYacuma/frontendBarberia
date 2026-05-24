@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+object ClienteBarberoPreseleccion {
+    var idBarbero: Long = 0L
+}
+
 data class ClienteUiState(
     val isLoading: Boolean = false,
     val barberos: List<BarberoDTO> = emptyList(),
@@ -29,7 +33,8 @@ data class ClienteUiState(
     val popularServicios: List<ServicioDTO> = emptyList(),
     val notificaciones: List<NotificacionDTO> = emptyList(),
     val citasConDetalles: List<CitaConDetalle> = emptyList(),
-    val barberoHorarios: List<HorarioBarberoDTO> = emptyList()
+    val barberoHorarios: List<HorarioBarberoDTO> = emptyList(),
+    val barberoAgendarId: Long = 0L
 )
 
 class ClienteViewModel(
@@ -356,6 +361,11 @@ class ClienteViewModel(
                 }
             } catch (_: Exception) { }
         }
+    }
+
+    fun preseleccionarBarbero(id: Long) {
+        _uiState.value = _uiState.value.copy(barberoAgendarId = id)
+        if (id != 0L) cargarHorariosBarbero(id)
     }
 
     fun clearMessages() {

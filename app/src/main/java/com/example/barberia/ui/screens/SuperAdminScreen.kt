@@ -246,7 +246,7 @@ fun SuperInicioTab(
             Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
                         Brush.horizontalGradient(
                             listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
-                        )))
+                        ))) {}
                     Column(modifier = Modifier.padding(
                         start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(),
@@ -400,7 +400,7 @@ fun SuperUsuariosTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
@@ -449,8 +449,8 @@ fun SuperUsuariosTab(
                                 defaultElevation = colores.sombra.dp)) {
                             Column {
                                 Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                                    Brush.horizontalGradient(listOf(SuperAccent, SuperAccent.copy(0.3f)))))
-                                Column(modifier = Modifier.padding(16.dp),
+                                    Brush.horizontalGradient(listOf(SuperAccent, SuperAccent.copy(0.3f))))) {}
+                                    Column(modifier = Modifier.padding(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Text("Nuevo usuario", color = colores.texto,
                                         fontWeight = FontWeight.Bold, fontSize = 15.sp)
@@ -714,7 +714,7 @@ fun SuperBarberosTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
@@ -760,7 +760,7 @@ fun SuperBarberosTab(
                                 defaultElevation = colores.sombra.dp)) {
                             Column {
                                 Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                                    Brush.horizontalGradient(listOf(SuperAccent, ColorVerde))))
+                                    Brush.horizontalGradient(listOf(SuperAccent, ColorVerde)))) {}
                                 Column(modifier = Modifier.padding(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Text("Nuevo barbero", color = colores.texto,
@@ -996,7 +996,7 @@ fun SuperServiciosTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
@@ -1079,7 +1079,7 @@ fun SuperServiciosTab(
                                 defaultElevation = colores.sombra.dp)) {
                             Column {
                                 Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                                    Brush.horizontalGradient(listOf(SuperAccent, ColorRojo))))
+                                    Brush.horizontalGradient(listOf(SuperAccent, ColorRojo)))) {}
                                 Column(modifier = Modifier.padding(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Text("Nuevo servicio", color = colores.texto,
@@ -1277,7 +1277,7 @@ fun SuperCitasTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {

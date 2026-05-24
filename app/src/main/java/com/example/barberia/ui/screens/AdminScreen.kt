@@ -170,17 +170,17 @@ fun AdminScreen(
                     modifier          = Modifier.padding(padding).fillMaxSize(),
                     userScrollEnabled = true
                 ) { pagina ->
-                    when (pagina) {
-                         0 -> AdminInicioTab(nombre, uiState, viewModel,
-                             onLogout, colores,
-                             onOpenDrawer = { scope.launch { drawerState.open() } },
-                             onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
-                             onNavigateToNotificaciones = onNavigateToNotificaciones)
-                        1 -> AdminCitasTab(uiState, viewModel, colores)
-                        2 -> AdminBarberosTab(uiState, viewModel, colores)
-                        3 -> AdminServiciosTab(uiState, viewModel, colores)
-                        4 -> AdminHorariosTab(uiState, viewModel, colores)
-                        5 -> AdminResenasTab(uiState, viewModel, colores)
+                when (pagina) {
+                     0 -> AdminInicioTab(nombre, uiState, viewModel,
+                         onLogout, colores,
+                         onOpenDrawer = { scope.launch { drawerState.open() } },
+                         onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
+                         onNavigateToNotificaciones = onNavigateToNotificaciones)
+                    1 -> AdminCitasTab(uiState, viewModel, colores)
+                    2 -> AdminUsuariosTab(uiState, viewModel, colores)
+                    3 -> AdminServiciosTab(uiState, viewModel, colores)
+                    4 -> AdminHorariosTab(uiState, viewModel, colores)
+                    5 -> AdminResenasTab(uiState, viewModel, colores)
                     }
                 }
         }
@@ -204,7 +204,7 @@ private fun AdminBottomBar(
         listOf(
             Triple("Inicio",    Icons.Filled.Home,          0),
             Triple("Citas",     Icons.Filled.CalendarMonth, 1),
-            Triple("Barberos",  Icons.Filled.People,        2),
+            Triple("Usuarios",  Icons.Filled.People,        2),
             Triple("Servicios", Icons.Filled.ContentCut,    3),
             Triple("Horarios",  Icons.Filled.Schedule,      4),
             Triple("Reseñas",   Icons.Filled.Star,          5)
@@ -268,7 +268,7 @@ private fun AdminInicioTab(
                     Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
                         Brush.horizontalGradient(
                             listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
-                        )))
+                        ))) {}
                     Column(modifier = Modifier.padding(
                         start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(),
@@ -341,10 +341,9 @@ private fun AdminInicioTab(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             AdminStatCard(
-                                numero = uiState.citasHoy.count {
-                                    it.estado == EstadoCitaEnum.CANCELADA }.toString(),
+                                numero = uiState.citasHoy.count { it.estado == EstadoCitaEnum.CANCELADA }.toString(),
                                 label  = "Cancelaciones hoy",
-                                color  = ColorError,
+                                color  = ColorRojo,
                                 colores = colores,
                                 modifier = Modifier.weight(1f),
                                 onClick = { onNavigateToTab(1) }
@@ -357,6 +356,32 @@ private fun AdminInicioTab(
                                 modifier = Modifier.weight(1f),
                                 onClick = { onNavigateToTab(3) }
                             )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                        SeccionTituloAdmin("Gestión rápida", colores)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AdminAccionCard(Icons.Filled.CalendarMonth,
+                                "Citas", "${uiState.citasHoy.size} para hoy · ${uiState.todasLasCitas.size} totales",
+                                AdminAccent, colores,
+                                onClick = { onNavigateToTab(1) })
+                            AdminAccionCard(Icons.Filled.People,
+                                "Usuarios", "${uiState.usuariosBarbero.size} barberos · ${uiState.todosUsuarios.size} usuarios",
+                                ColorVerde, colores,
+                                onClick = { onNavigateToTab(2) })
+                            AdminAccionCard(Icons.Filled.ContentCut,
+                                "Servicios", "${uiState.servicios.size} servicios activos",
+                                ColorAzulClaro, colores,
+                                onClick = { onNavigateToTab(3) })
+                            AdminAccionCard(Icons.Filled.Schedule,
+                                "Horarios", "${uiState.horarios.groupBy { it.idBarbero }.size} barberos con horario",
+                                ColorDorado, colores,
+                                onClick = { onNavigateToTab(4) })
                         }
                     }
                     Spacer(modifier = Modifier.height(20.dp))
@@ -388,7 +413,7 @@ private fun AdminCitasTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
@@ -566,11 +591,12 @@ private fun AdminCitasTab(
 // ══════════════════════════════════════════════════════════════════════════════
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AdminBarberosTab(
+private fun AdminUsuariosTab(
     uiState: com.example.barberia.viewmodel.AdminUiState,
     viewModel: AdminViewModel,
     colores: BarberiaColores
 ) {
+    var subTabIndex by remember { mutableIntStateOf(0) }
     var mostrarFormulario  by remember { mutableStateOf(false) }
     var nombreBarbero      by remember { mutableStateOf("") }
     var especialidad       by remember { mutableStateOf("") }
@@ -583,17 +609,26 @@ private fun AdminBarberosTab(
     var editTelefono       by remember { mutableStateOf("") }
     var editIdUsuario      by remember { mutableStateOf<Long?>(null) }
     var isRefreshing       by remember { mutableStateOf(false) }
+    var barberoDescanso    by remember { mutableStateOf<BarberoDTO?>(null) }
+    var diaDescanso        by remember { mutableStateOf("") }
+    var bloqueDescanso     by remember { mutableStateOf("") }
+    var clienteAgendar     by remember { mutableStateOf<UsuarioDTO?>(null) }
+
+    LaunchedEffect(subTabIndex) {
+        if (subTabIndex == 0) viewModel.cargarUsuariosPorRol("CLIENTE")
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
                 isRefreshing = true
                 viewModel.cargarDatosIniciales()
+                if (subTabIndex == 0) viewModel.cargarUsuariosPorRol("CLIENTE")
                 isRefreshing = false
             },
             modifier = Modifier.weight(1f)
@@ -605,136 +640,203 @@ private fun AdminBarberosTab(
             ) {
                 item {
                     Spacer(modifier = Modifier.height(20.dp))
-                    Row(modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Column {
-                            Text("Barberos", color = colores.texto,
-                                fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            Text("${uiState.barberos.size} registrados",
-                                color = colores.textoSub, fontSize = 13.sp)
-                        }
-                        FloatingActionButton(
-                            onClick = { mostrarFormulario = !mostrarFormulario },
-                            containerColor = AdminAccent,
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Icon(
-                                if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
-                                null, tint = Color.White, modifier = Modifier.size(20.dp))
-                        }
-                    }
-                }
-
-            item {
-                Column {
-                    AnimatedVisibility(
-                        visible = mostrarFormulario,
-                        enter   = expandVertically() + fadeIn(),
-                        exit    = shrinkVertically() + fadeOut()
-                    ) {
-                        Card(modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = colores.superficie),
-                            elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
-                            Column {
-                                Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                                    Brush.horizontalGradient(listOf(AdminAccent, ColorAzul))))
-                            Column(modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text("Nuevo barbero", color = colores.texto,
-                                    fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                BarberiaTextField(nombreBarbero,
-                                    { nombreBarbero = it }, "Nombre *",
-                                    Icons.Filled.Person, AdminAccent, colores)
-                                BarberiaTextField(especialidad,
-                                    { especialidad = it }, "Especialidad",
-                                    Icons.Filled.ContentCut, AdminAccent, colores)
-                                BarberiaTextField(telefono,
-                                    { telefono = it }, "Teléfono",
-                                    Icons.Filled.Phone, AdminAccent, colores,
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Phone))
-
-                                if (uiState.usuariosBarbero.isNotEmpty()) {
-                                    Text("Vincular con usuario",
-                                        color = colores.textoSub, fontSize = 12.sp)
-                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        item {
-                                            Box(modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(if (usuarioVinculado == null)
-                                                    AdminAccent else colores.superficie2)
-                                                .border(1.dp, if (usuarioVinculado == null)
-                                                    AdminAccent else colores.borde,
-                                                    RoundedCornerShape(8.dp))
-                                                .clickable { usuarioVinculado = null }
-                                                .padding(horizontal = 10.dp, vertical = 6.dp)) {
-                                                Text("Sin vínculo",
-                                                    color = if (usuarioVinculado == null)
-                                                        Color.White else colores.texto,
-                                                    fontSize = 11.sp)
-                                            }
-                                        }
-                                        items(uiState.usuariosBarbero) { user ->
-                                            val sel = usuarioVinculado == user.idUsuario
-                                            Box(modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(if (sel) AdminAccent else colores.superficie2)
-                                                .border(1.dp, if (sel) AdminAccent else colores.borde,
-                                                    RoundedCornerShape(8.dp))
-                                                .clickable { usuarioVinculado = user.idUsuario }
-                                                .padding(horizontal = 10.dp, vertical = 6.dp)) {
-                                                Text(user.nombre?.take(15) ?: "User #${user.idUsuario}",
-                                                    color = if (sel) Color.White else colores.texto,
-                                                    fontSize = 11.sp)
-                                            }
-                                        }
-                                    }
-                                }
-
-                                BarberiaBoton(
-                                    texto      = "Crear barbero",
-                                    icono      = Icons.Filled.PersonAdd,
-                                    isLoading  = uiState.isLoading,
-                                    colorFondo = if (nombreBarbero.isNotBlank())
-                                        AdminAccent else colores.borde,
-                                    onClick    = {
-                                        if (nombreBarbero.isNotBlank()) {
-                                            viewModel.crearBarbero(
-                                                nombreBarbero, especialidad, telefono,
-                                                usuarioVinculado)
-                                            nombreBarbero = ""; especialidad = ""
-                                            telefono = ""; usuarioVinculado = null
-                                            mostrarFormulario = false
-                                        }
-                                    }
-                                )
+                    Text("Usuarios", color = colores.texto,
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listOf("Clientes", "Barberos").forEachIndexed { idx, label ->
+                            Box(modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (subTabIndex == idx) AdminAccent else colores.superficie2)
+                                .clickable { subTabIndex = idx }
+                                .padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                Text(label,
+                                    color = if (subTabIndex == idx) Color.White else colores.texto,
+                                    fontWeight = FontWeight.Medium, fontSize = 13.sp)
                             }
                         }
                     }
                 }
+
+                if (subTabIndex == 0) {
+                    // ── CLIENTES ──
+                    if (uiState.usuariosPorRol.isEmpty()) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().height(150.dp),
+                                contentAlignment = Alignment.Center) {
+                                Text("No hay clientes registrados",
+                                    color = colores.textoSub, fontSize = 13.sp)
+                            }
+                        }
+                    } else {
+                        items(uiState.usuariosPorRol) { cliente ->
+                            Card(modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = colores.superficie),
+                                elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Box(modifier = Modifier.size(40.dp).clip(CircleShape)
+                                            .background(AdminAccent.copy(0.15f)),
+                                            contentAlignment = Alignment.Center) {
+                                            Text(cliente.nombre?.take(2)?.uppercase() ?: "?",
+                                                color = AdminAccent,
+                                                fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(cliente.nombre ?: "Sin nombre",
+                                                color = colores.texto,
+                                                fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                            Text(cliente.correo ?: cliente.telefono ?: "",
+                                                color = colores.textoSub, fontSize = 12.sp,
+                                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                        OutlinedButton(
+                                            onClick = { clienteAgendar = cliente },
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(Icons.Filled.CalendarMonth, null,
+                                                modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Agendar", fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // ── BARBEROS ──
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text("${uiState.barberos.size} registrados",
+                                color = colores.textoSub, fontSize = 13.sp)
+                            FloatingActionButton(
+                                onClick = { mostrarFormulario = !mostrarFormulario },
+                                containerColor = AdminAccent,
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Icon(
+                                    if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
+                                    null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                    }
+
+                    item {
+                        Column {
+                            AnimatedVisibility(
+                                visible = mostrarFormulario,
+                                enter   = expandVertically() + fadeIn(),
+                                exit    = shrinkVertically() + fadeOut()
+                            ) {
+                                Card(modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = colores.superficie),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+                                    Column {
+                                        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+                                            Brush.horizontalGradient(listOf(AdminAccent, ColorAzul)))) {}
+                                    Column(modifier = Modifier.padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Text("Nuevo barbero", color = colores.texto,
+                                            fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        BarberiaTextField(nombreBarbero,
+                                            { nombreBarbero = it }, "Nombre *",
+                                            Icons.Filled.Person, AdminAccent, colores)
+                                        BarberiaTextField(especialidad,
+                                            { especialidad = it }, "Especialidad",
+                                            Icons.Filled.ContentCut, AdminAccent, colores)
+                                        BarberiaTextField(telefono,
+                                            { telefono = it }, "Teléfono",
+                                            Icons.Filled.Phone, AdminAccent, colores,
+                                            keyboardOptions = KeyboardOptions(
+                                                keyboardType = KeyboardType.Phone))
+
+                                        if (uiState.usuariosBarbero.isNotEmpty()) {
+                                            Text("Vincular con usuario",
+                                                color = colores.textoSub, fontSize = 12.sp)
+                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                item {
+                                                    Box(modifier = Modifier
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(if (usuarioVinculado == null)
+                                                            AdminAccent else colores.superficie2)
+                                                        .border(1.dp, if (usuarioVinculado == null)
+                                                            AdminAccent else colores.borde,
+                                                            RoundedCornerShape(8.dp))
+                                                        .clickable { usuarioVinculado = null }
+                                                        .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                                        Text("Sin vínculo",
+                                                            color = if (usuarioVinculado == null)
+                                                                Color.White else colores.texto,
+                                                            fontSize = 11.sp)
+                                                    }
+                                                }
+                                                items(uiState.usuariosBarbero) { user ->
+                                                    val sel = usuarioVinculado == user.idUsuario
+                                                    Box(modifier = Modifier
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(if (sel) AdminAccent else colores.superficie2)
+                                                        .border(1.dp, if (sel) AdminAccent else colores.borde,
+                                                            RoundedCornerShape(8.dp))
+                                                        .clickable { usuarioVinculado = user.idUsuario }
+                                                        .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                                        Text(user.nombre?.take(15) ?: "User #${user.idUsuario}",
+                                                            color = if (sel) Color.White else colores.texto,
+                                                            fontSize = 11.sp)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        BarberiaBoton(
+                                            texto      = "Crear barbero",
+                                            icono      = Icons.Filled.PersonAdd,
+                                            isLoading  = uiState.isLoading,
+                                            colorFondo = if (nombreBarbero.isNotBlank())
+                                                AdminAccent else colores.borde,
+                                            onClick    = {
+                                                if (nombreBarbero.isNotBlank()) {
+                                                    viewModel.crearBarbero(
+                                                        nombreBarbero, especialidad, telefono,
+                                                        usuarioVinculado)
+                                                    nombreBarbero = ""; especialidad = ""
+                                                    telefono = ""; usuarioVinculado = null
+                                                    mostrarFormulario = false
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    }
+
+                    items(uiState.barberos) { barbero ->
+                        TarjetaBarberoAdmin(
+                            barbero   = barbero,
+                            colores   = colores,
+                            onToggle  = { viewModel.toggleActivoBarbero(barbero) },
+                            onEditar  = {
+                                barberoAEditar = barbero
+                                editNombre = barbero.nombre
+                                editEspecialidad = barbero.especialidad ?: ""
+                                editTelefono = barbero.telefono ?: ""
+                                editIdUsuario = barbero.idUsuario
+                            },
+                            onEliminar = { barberoAEliminar = barbero },
+                            onCuadrarDescanso = { barberoDescanso = barbero }
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(20.dp)) }
                 }
             }
-
-            items(uiState.barberos) { barbero ->
-                TarjetaBarberoAdmin(
-                    barbero   = barbero,
-                    colores   = colores,
-                    onToggle  = { viewModel.toggleActivoBarbero(barbero) },
-                    onEditar  = {
-                        barberoAEditar = barbero
-                        editNombre = barbero.nombre
-                        editEspecialidad = barbero.especialidad ?: ""
-                        editTelefono = barbero.telefono ?: ""
-                        editIdUsuario = barbero.idUsuario
-                    },
-                    onEliminar = { barberoAEliminar = barbero }
-                )
-            }
-            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
-    }
     }
 
     barberoAEliminar?.let { barbero ->
@@ -838,6 +940,131 @@ private fun AdminBarberosTab(
             }
         }
     }
+
+    // Cuadrar descansos BottomSheet
+    if (barberoDescanso != null) {
+        ModalBottomSheet(
+            onDismissRequest = { barberoDescanso = null; diaDescanso = ""; bloqueDescanso = "" },
+            containerColor = colores.superficie
+        ) {
+            Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
+                Text("Cuadrar descanso para ${barberoDescanso!!.nombre}",
+                    color = colores.texto, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.height(16.dp))
+                Text("Día de la semana", color = colores.textoSub, fontSize = 13.sp)
+                Spacer(Modifier.height(8.dp))
+                val dias = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+                val diasFull = listOf("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO")
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(dias.size) { i ->
+                        Box(modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (diaDescanso == diasFull[i]) AdminAccent else colores.superficie2)
+                            .clickable { diaDescanso = diasFull[i] }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)) {
+                            Text(dias[i],
+                                color = if (diaDescanso == diasFull[i]) Color.White else colores.texto,
+                                fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Text("Bloque de descanso (1 hora)", color = colores.textoSub, fontSize = 13.sp)
+                Spacer(Modifier.height(8.dp))
+                val bloques = (9..18).map { h ->
+                    "${"%02d".format(h)}:00-${"%02d".format(h + 1)}:00"
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(bloques) { bloque ->
+                        val sel = bloqueDescanso == bloque
+                        Box(modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (sel) AdminAccent else colores.superficie2)
+                            .clickable { bloqueDescanso = bloque }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)) {
+                            Text(bloque,
+                                color = if (sel) Color.White else colores.texto,
+                                fontSize = 12.sp,
+                                fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+                BarberiaBoton(
+                    texto = "Guardar descanso",
+                    colorFondo = if (diaDescanso.isNotBlank() && bloqueDescanso.isNotBlank())
+                        AdminAccent else colores.borde,
+                    onClick = {
+                        if (diaDescanso.isNotBlank() && bloqueDescanso.isNotBlank()) {
+                            val days = listOf("DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO")
+                            val targetIndex = days.indexOf(diaDescanso.uppercase())
+                            if (targetIndex >= 0) {
+                                val cal = java.util.Calendar.getInstance()
+                                val todayIndex = cal.get(java.util.Calendar.DAY_OF_WEEK) - 1
+                                var diff = targetIndex - todayIndex
+                                if (diff <= 0) diff += 7
+                                cal.add(java.util.Calendar.DAY_OF_MONTH, diff)
+                                val fecha = "%d-%02d-%02d".format(
+                                    cal.get(java.util.Calendar.YEAR),
+                                    cal.get(java.util.Calendar.MONTH) + 1,
+                                    cal.get(java.util.Calendar.DAY_OF_MONTH))
+                                val parts = bloqueDescanso.split("-")
+                                viewModel.crearBloqueo(
+                                    BloqueoHorarioDTO(
+                                        idBloqueo = null,
+                                        idBarbero = barberoDescanso!!.idBarbero!!,
+                                        fechaInicio = "${fecha}T${parts[0]}:00",
+                                        fechaFin = "${fecha}T${parts[1]}:00",
+                                        motivo = "Descanso programado"
+                                    )
+                                )
+                            }
+                            barberoDescanso = null; diaDescanso = ""; bloqueDescanso = ""
+                        }
+                    }
+                )
+                Spacer(Modifier.height(30.dp))
+            }
+        }
+    }
+
+    // Diálogo Agendar cita para cliente
+    clienteAgendar?.let { cliente ->
+        AlertDialog(
+            onDismissRequest = { clienteAgendar = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Person, null, tint = AdminAccent, modifier = Modifier.size(36.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Agendar cita para", color = colores.texto,
+                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(cliente.nombre ?: "", color = AdminAccent,
+                        fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                }
+            },
+            text = {
+                Column {
+                    Text("Se agendará una cita usando el perfil de ${cliente.nombre}.",
+                        color = colores.textoSub, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("ID Usuario: #${cliente.idUsuario}",
+                        color = colores.textoSub, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                BarberiaBoton("Abrir agenda", onClick = {
+                    clienteAgendar = null
+                })
+            },
+            dismissButton = {
+                TextButton(onClick = { clienteAgendar = null }) {
+                    Text("Cerrar", color = colores.textoSub) }
+            }
+        )
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -880,7 +1107,7 @@ private fun AdminServiciosTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
@@ -959,7 +1186,7 @@ private fun AdminServiciosTab(
                             defaultElevation = colores.sombra.dp)) {
                         Column {
                             Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                                Brush.horizontalGradient(listOf(ColorVerde, AdminAccent))))
+                                Brush.horizontalGradient(listOf(ColorVerde, AdminAccent)))) {}
                             Column(modifier = Modifier.padding(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Text("Nuevo servicio", color = colores.texto,
@@ -1158,15 +1385,12 @@ private fun AdminHorariosTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
                 isRefreshing = true
-                uiState.barberoSeleccionado?.let {
-                    viewModel.cargarHorarios(it.idBarbero!!)
-                }
-                viewModel.cargarDatosIniciales()
+                viewModel.cargarResenas()
                 isRefreshing = false
             },
             modifier = Modifier.weight(1f)
@@ -1177,15 +1401,21 @@ private fun AdminHorariosTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Horarios", color = colores.texto,
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text("Selecciona un barbero para gestionar sus horarios",
-                        color = colores.textoSub, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("Reseñas", color = colores.texto,
+                                fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text("Selecciona un barbero para gestionar sus horarios",
+                                    color = colores.textoSub, fontSize = 13.sp)
+                            }
+                        }
                 }
 
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     uiState.barberos.forEach { barbero ->
                         val sel = uiState.barberoSeleccionado?.idBarbero == barbero.idBarbero
                         Card(
@@ -1606,12 +1836,12 @@ private fun AdminResenasTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(AdminAccent, ColorBlanco, ColorRojo, ColorBlanco, AdminAccent)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
                 isRefreshing = true
-                viewModel.cargarResenas()
+                viewModel.cargarDatosIniciales()
                 isRefreshing = false
             },
             modifier = Modifier.weight(1f)
@@ -1622,7 +1852,7 @@ private fun AdminResenasTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Row(modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
@@ -1893,6 +2123,36 @@ private fun AdminStatCard(
 }
 
 @Composable
+private fun AdminAccionCard(
+    icono: ImageVector, titulo: String, subtitulo: String, color: Color,
+    colores: BarberiaColores, onClick: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()
+        .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = colores.superficie),
+        elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+        Row(modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                .background(color.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center) {
+                Icon(icono, null, tint = color, modifier = Modifier.size(20.dp))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(titulo, color = colores.texto,
+                    fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                Text(subtitulo, color = colores.textoSub, fontSize = 12.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Icon(Icons.Filled.ChevronRight, null,
+                tint = colores.textoSub, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+@Composable
 private fun SeccionTituloAdmin(texto: String, colores: BarberiaColores) {
     Row(verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1997,46 +2257,58 @@ private fun TarjetaCitaAdmin(
 @Composable
 private fun TarjetaBarberoAdmin(
     barbero: BarberoDTO, colores: BarberiaColores,
-    onToggle: () -> Unit, onEditar: () -> Unit, onEliminar: () -> Unit
+    onToggle: () -> Unit, onEditar: () -> Unit, onEliminar: () -> Unit,
+    onCuadrarDescanso: () -> Unit = {}
 ) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
-        Row(modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(modifier = Modifier.size(42.dp).clip(CircleShape)
-                .background(if (barbero.activo == true)
-                    AdminAccent.copy(0.15f) else colores.borde),
-                contentAlignment = Alignment.Center) {
-                Text(barbero.nombre.take(2).uppercase(),
-                    color = if (barbero.activo == true) AdminAccent else colores.textoSub,
-                    fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(barbero.nombre, color = colores.texto,
-                    fontWeight = FontWeight.Medium, fontSize = 14.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(barbero.especialidad ?: "Sin especialidad",
-                    color = colores.textoSub, fontSize = 12.sp)
-            }
-            Switch(
-                checked  = barbero.activo ?: false,
-                onCheckedChange = { onToggle() },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor      = Color.White,
-                    checkedTrackColor      = AdminAccent,
-                    uncheckedThumbColor    = Color.White,
-                    uncheckedTrackColor    = colores.borde
+        Column {
+            Row(modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(modifier = Modifier.size(42.dp).clip(CircleShape)
+                    .background(if (barbero.activo == true)
+                        AdminAccent.copy(0.15f) else colores.borde),
+                    contentAlignment = Alignment.Center) {
+                    Text(barbero.nombre.take(2).uppercase(),
+                        color = if (barbero.activo == true) AdminAccent else colores.textoSub,
+                        fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(barbero.nombre, color = colores.texto,
+                        fontWeight = FontWeight.Medium, fontSize = 14.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(barbero.especialidad ?: "Sin especialidad",
+                        color = colores.textoSub, fontSize = 12.sp)
+                }
+                Switch(
+                    checked  = barbero.activo ?: false,
+                    onCheckedChange = { onToggle() },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor      = Color.White,
+                        checkedTrackColor      = AdminAccent,
+                        uncheckedThumbColor    = Color.White,
+                        uncheckedTrackColor    = colores.borde
+                    )
                 )
-            )
-            IconButton(onClick = onEditar, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.Edit, null,
-                    tint = AdminAccent, modifier = Modifier.size(16.dp))
+                IconButton(onClick = onEditar, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Filled.Edit, null,
+                        tint = AdminAccent, modifier = Modifier.size(16.dp))
+                }
+                IconButton(onClick = onEliminar, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Filled.DeleteOutline, null,
+                        tint = ColorError, modifier = Modifier.size(18.dp))
+                }
             }
-            IconButton(onClick = onEliminar, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.DeleteOutline, null,
-                    tint = ColorError, modifier = Modifier.size(18.dp))
+            HorizontalDivider(color = colores.borde.copy(0.5f))
+            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                TextButton(onClick = onCuadrarDescanso) {
+                    Icon(Icons.Filled.Block, null, tint = ColorError,
+                        modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Cuadrar descansos", color = ColorError, fontSize = 12.sp)
+                }
             }
         }
     }

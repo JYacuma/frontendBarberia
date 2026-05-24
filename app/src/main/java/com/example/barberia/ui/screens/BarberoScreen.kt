@@ -359,7 +359,7 @@ private fun HoyTab(
                 Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
                     Brush.horizontalGradient(
                         listOf(ColorAzul, ColorBlanco, ColorAzul, ColorBlanco, ColorAzul)
-                    )))
+                    ))) {}
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -675,7 +675,7 @@ private fun AgendaTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = uiState.isLoading,
             onRefresh = { viewModel.cargarDatosIniciales() },
@@ -810,7 +810,7 @@ private fun ResenasBarberoTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
-            )))
+            ))) {}
         LazyColumn(
             modifier = Modifier.weight(1f)
                 .padding(horizontal = 20.dp),
@@ -829,7 +829,7 @@ private fun ResenasBarberoTab(
                     elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
                     Column {
                         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                            Brush.horizontalGradient(listOf(ColorDorado, ColorDorado.copy(0.3f)))))
+                            Brush.horizontalGradient(listOf(ColorDorado, ColorDorado.copy(0.3f))))) {}
                         Row(modifier = Modifier.padding(20.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically) {
@@ -931,7 +931,7 @@ private fun HorariosBarberoTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
-            )))
+            ))) {}
         LazyColumn(
             modifier = Modifier.weight(1f)
                 .padding(horizontal = 20.dp),

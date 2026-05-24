@@ -16,9 +16,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.barberia.model.RolEnum
 import com.example.barberia.network.AuthRepository
 import com.example.barberia.network.RetrofitClient
@@ -27,6 +29,7 @@ import com.example.barberia.ui.auth.LoginScreen
 import com.example.barberia.ui.auth.RegisterScreen
 import com.example.barberia.ui.screens.AdminScreen
 import com.example.barberia.ui.screens.BarberoScreen
+import com.example.barberia.ui.screens.InfoBarberoScreen
 import com.example.barberia.ui.screens.NotificacionesScreen
 import com.example.barberia.ui.screens.PerfilScreen
 import com.example.barberia.ui.screens.SuperAdminScreen
@@ -43,6 +46,8 @@ object Routes {
     const val SUPERADMIN_HOME = "superadmin_home"
     const val NOTIFICACIONES  = "notificaciones"
     const val PERFIL          = "perfil"
+    const val INFO_BARBERO    = "info_barbero/{idBarbero}"
+    fun infoBarbero(idBarbero: Long) = "info_barbero/$idBarbero"
 }
 
 class MainActivity : ComponentActivity() {
@@ -162,7 +167,10 @@ class MainActivity : ComponentActivity() {
                                     onNavigateToNotificaciones = {
                                         navController.navigate(Routes.NOTIFICACIONES)
                                     },
-                                    onNavigateToPerfil = { navController.navigate(Routes.PERFIL) }
+                                    onNavigateToPerfil = { navController.navigate(Routes.PERFIL) },
+                                    onNavigateToInfoBarbero = { idBarbero ->
+                                        navController.navigate(Routes.infoBarbero(idBarbero))
+                                    }
                                 )
                             }
 
@@ -243,6 +251,22 @@ class MainActivity : ComponentActivity() {
                                         navController.navigate(Routes.NOTIFICACIONES)
                                     },
                                     onNavigateToPerfil = { navController.navigate(Routes.PERFIL) }
+                                )
+                            }
+
+                            composable(
+                                Routes.INFO_BARBERO,
+                                arguments = listOf(navArgument("idBarbero") { type = NavType.LongType })
+                            ) {
+                                val idBarbero = it.arguments?.getLong("idBarbero") ?: 0L
+                                InfoBarberoScreen(
+                                    apiService = RetrofitClient.apiService,
+                                    idBarbero  = idBarbero,
+                                    onVolver   = { navController.popBackStack() },
+                                    onAgendar  = { id ->
+                                        com.example.barberia.viewmodel.ClienteBarberoPreseleccion.idBarbero = id
+                                        navController.popBackStack()
+                                    }
                                 )
                             }
 

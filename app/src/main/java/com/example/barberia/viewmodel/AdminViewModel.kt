@@ -538,6 +538,25 @@ class AdminViewModel(
         }
     }
 
+    fun crearBloqueo(dto: BloqueoHorarioDTO) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.createBloqueo(dto)
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        successMessage = "Descanso guardado correctamente"
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = "Error al guardar descanso (${response.code()})"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Sin conexión.")
+            }
+        }
+    }
+
     fun clearMessages() {
         _uiState.value = _uiState.value.copy(
             errorMessage   = null,

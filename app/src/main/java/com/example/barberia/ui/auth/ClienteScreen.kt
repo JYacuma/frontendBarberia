@@ -41,6 +41,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.barberia.model.*
 import com.example.barberia.network.ApiService
 import com.example.barberia.ui.theme.*
+import com.example.barberia.viewmodel.ClienteBarberoPreseleccion
 import com.example.barberia.viewmodel.ClienteViewModel
 import com.example.barberia.viewmodel.ClienteUiState
 
@@ -71,7 +72,8 @@ fun ClienteScreen(
     nombre: String,
     onLogout: () -> Unit,
     onNavigateToNotificaciones: () -> Unit = {},
-    onNavigateToPerfil: () -> Unit = {}
+    onNavigateToPerfil: () -> Unit = {},
+    onNavigateToInfoBarbero: (Long) -> Unit = {}
 ) {
     val viewModel: ClienteViewModel = viewModel(
         key     = "cliente_$idUsuario",
@@ -99,6 +101,20 @@ fun ClienteScreen(
         uiState.errorMessage?.let {
             snackbarState.showSnackbar(it)
             viewModel.clearMessages()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val id = ClienteBarberoPreseleccion.idBarbero
+        if (id != 0L) {
+            ClienteBarberoPreseleccion.idBarbero = 0L
+            viewModel.preseleccionarBarbero(id)
+        }
+    }
+
+    LaunchedEffect(uiState.barberoAgendarId) {
+        if (uiState.barberoAgendarId != 0L) {
+            pagerState.animateScrollToPage(1)
         }
     }
 
@@ -161,72 +177,26 @@ fun ClienteScreen(
                         onClick = {
                             TemaManager.modoOscuro.value = mode
                             scope.launch { drawerState.close() }
-                        }
-                    )
-                }
-            }
         }
+    )
+        }   // close forEach
+        }   // close ModalDrawerSheet
+    }   // close drawerContent
     ) {
-        Scaffold(
-        containerColor = colores.fondo,
-        snackbarHost = {
-            SnackbarHost(snackbarState) { data ->
-                Snackbar(
-                    snackbarData   = data,
-                    containerColor = colores.superficie,
-                    contentColor   = colores.texto,
-                    actionColor    = ColorRojo,
-                    shape          = RoundedCornerShape(12.dp)
-                )
-            }
-        },
-
-        bottomBar = {
-            NavigationBar(
-                containerColor = colores.superficie,
-                tonalElevation = 0.dp,
-                modifier = if (!colores.esModoOscuro) Modifier.shadow(4.dp)
-                else Modifier.border(1.dp, colores.borde,
-                    RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp))
-            ) {
-                listOf(
-                    Triple("Inicio",   Icons.Filled.Home,          0),
-                    Triple("Agendar",  Icons.Filled.CalendarMonth, 1),
-                    Triple("Mis Citas",Icons.Filled.List,           2)
-                ).forEach { (label, icon, index) ->
-                    val activo = pagerState.currentPage == index
-                    NavigationBarItem(
-                        selected = activo,
-                        onClick  = { scope.launch { pagerState.animateScrollToPage(index) } },
-                        icon = { Icon(icon, label,
-                            tint = if (activo) ColorRojo else colores.textoSub,
-                            modifier = Modifier.size(22.dp)) },
-                        label = { Text(label,
-                            color = if (activo) ColorRojo else colores.textoSub,
-                            fontSize = 10.sp,
-                            fontWeight = if (activo) FontWeight.SemiBold
-                            else FontWeight.Normal) },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = ColorRojo.copy(alpha = 0.15f))
-                    )
-                }
-            }
-        }
-    ) { padding ->
         HorizontalPager(
             state             = pagerState,
-            modifier          = Modifier.padding(padding).fillMaxSize(),
+            modifier          = Modifier.fillMaxSize(),
             userScrollEnabled = true
         ) { pagina ->
             when (pagina) {
                  0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones,
                      onNavigateToPerfil = onNavigateToPerfil,
-                     onOpenDrawer = { scope.launch { drawerState.open() } })
+                     onOpenDrawer = { scope.launch { drawerState.open() } },
+                     onNavigateToInfoBarbero = onNavigateToInfoBarbero)
                 1 -> AgendarTab(uiState, viewModel, colores)
                  2 -> MisCitasTab(uiState, viewModel, colores)
             }
         }
-    }
     }
 }
 
@@ -244,7 +214,8 @@ private fun InicioTab(
     onLogout: () -> Unit,
     onNavigateToNotificaciones: () -> Unit,
     onNavigateToPerfil: () -> Unit = {},
-    onOpenDrawer: () -> Unit = {}
+    onOpenDrawer: () -> Unit = {},
+    onNavigateToInfoBarbero: (Long) -> Unit = {}
 ) {
     val initials = remember(nombre) {
         val ascii = Normalizer.normalize(nombre, Normalizer.Form.NFD)
@@ -255,9 +226,9 @@ private fun InicioTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
-            )))
+            ))) {}
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(modifier = Modifier.size(44.dp).clip(CircleShape)
@@ -308,9 +279,8 @@ private fun InicioTab(
                         Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    // Barberos populares - tarjetas expandibles
+                    // Barberos - tarjetas del mismo tamaño
                     item {
-                        var barberoExpandido by remember { mutableStateOf<String?>(null) }
                         SeccionTituloCliente("Nuestros Barberos", colores,
                             modifier = Modifier.padding(horizontal = 20.dp))
                         Spacer(modifier = Modifier.height(10.dp))
@@ -329,13 +299,12 @@ private fun InicioTab(
                                 contentPadding = PaddingValues(horizontal = 20.dp)
                             ) {
                                 items(barberosMostrar, key = { it.idBarbero ?: 0 }) { barbero ->
-                                    val expandido = barberoExpandido == barbero.idBarbero.toString()
                                     Card(
                                         modifier = Modifier
-                                            .width(if (expandido) 200.dp else 120.dp)
+                                            .width(110.dp)
                                             .shadow(4.dp, RoundedCornerShape(16.dp))
                                             .clickable {
-                                                barberoExpandido = if (expandido) null else barbero.idBarbero.toString()
+                                                onNavigateToInfoBarbero(barbero.idBarbero ?: 0L)
                                             },
                                         shape = RoundedCornerShape(16.dp),
                                         colors = CardDefaults.cardColors(
@@ -343,9 +312,9 @@ private fun InicioTab(
                                     ) {
                                         Column(modifier = Modifier.padding(12.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Box(modifier = Modifier.size(60.dp).clip(RoundedCornerShape(16.dp))
+                                            Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(14.dp))
                                                 .background(ColorRojo.copy(0.15f))
-                                                .border(1.5.dp, ColorRojo.copy(0.3f), RoundedCornerShape(16.dp)),
+                                                .border(1.5.dp, ColorRojo.copy(0.3f), RoundedCornerShape(14.dp)),
                                                 contentAlignment = Alignment.Center) {
                                                 Text(barbero.nombre.take(2).uppercase(),
                                                     color = ColorRojo,
@@ -357,30 +326,9 @@ private fun InicioTab(
                                                 fontWeight = FontWeight.Medium,
                                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             barbero.especialidad?.let {
-                                                Text(it, color = ColorRojo,
-                                                    fontSize = 10.sp,
-                                                    textAlign = TextAlign.Center,
-                                                    fontWeight = FontWeight.Medium)
-                                            }
-                                            if (expandido) {
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                HorizontalDivider(color = colores.borde)
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text("Especialidad: ${barbero.especialidad ?: "General"}",
-                                                    color = colores.textoSub, fontSize = 11.sp)
-                                                if (!barbero.telefono.isNullOrBlank()) {
-                                                    Text("Teléfono: ${barbero.telefono}",
-                                                        color = colores.textoSub, fontSize = 11.sp)
-                                                }
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                BarberiaBoton(
-                                                    texto = "Agendar",
-                                                    colorFondo = ColorRojo,
-                                                    onClick = {
-                                                        barberoExpandido = null
-                                                        scope.launch { pagerState.animateScrollToPage(1) }
-                                                    }
-                                                )
+                                                Text(it, color = colores.textoSub,
+                                                    fontSize = 10.sp, textAlign = TextAlign.Center,
+                                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             }
                                         }
                                     }
@@ -505,6 +453,19 @@ private fun AgendarTab(
     var filtroServicioIdx     by remember { mutableIntStateOf(0) }
     var expandidoEspecialidad by remember { mutableStateOf(false) }
     var expandidoServicio     by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.barberoAgendarId) {
+        val id = uiState.barberoAgendarId
+        if (id != 0L) {
+            viewModel.preseleccionarBarbero(0L)
+            val barbero = uiState.barberos.find { it.idBarbero == id }
+                ?: uiState.popularBarberos.find { it.idBarbero == id }
+            if (barbero != null) {
+                barberoSeleccionado = barbero
+                pasoAgenda = 1
+            }
+        }
+    }
 
     val especialidades = remember(uiState.barberos) {
         uiState.barberos.mapNotNull { it.especialidad }.distinct().sorted()
@@ -722,7 +683,7 @@ private fun AgendarTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = uiState.isLoading,
             onRefresh = { viewModel.cargarDatosIniciales() },
@@ -793,7 +754,8 @@ private fun AgendarTab(
                         items(barberosFiltrados, key = { it.idBarbero ?: 0 }) { barbero ->
                             val seleccionado = barberoSeleccionado?.idBarbero == barbero.idBarbero
                             Card(
-                                modifier = Modifier.width(120.dp)
+                                modifier = Modifier.width(110.dp)
+                                    .height(IntrinsicSize.Min)
                                     .shadow(4.dp, RoundedCornerShape(14.dp))
                                     .clickable {
                                         barberoSeleccionado = barbero
@@ -820,7 +782,8 @@ private fun AgendarTab(
                                     barbero.especialidad?.let {
                                         Text(it,
                                             color = if (seleccionado) Color.White.copy(0.7f) else colores.textoSub,
-                                            fontSize = 10.sp, textAlign = TextAlign.Center)
+                                            fontSize = 10.sp, textAlign = TextAlign.Center,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                             }
@@ -848,6 +811,7 @@ private fun AgendarTab(
                                     val sel = servicioSeleccionado?.idServicio == servicio.idServicio
                                     Card(
                                         modifier = Modifier.fillMaxWidth()
+                                            .height(IntrinsicSize.Min)
                                             .shadow(4.dp, RoundedCornerShape(14.dp))
                                             .clickable {
                                                 servicioSeleccionado = servicio
@@ -958,13 +922,14 @@ private fun AgendarTab(
                                         val horaCorta = hora.take(5)
                                         val sel = horaSeleccionada == hora
                                         Box(modifier = Modifier
+                                            .width(90.dp)
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(if (sel) ColorRojo else colores.superficie)
                                             .border(1.dp,
                                                 if (sel) ColorRojo else colores.borde,
                                                 RoundedCornerShape(10.dp))
                                             .clickable { horaSeleccionada = hora }
-                                            .padding(horizontal = 16.dp, vertical = 10.dp)) {
+                                            .padding(horizontal = 8.dp, vertical = 10.dp)) {
                                             Text(horaCorta,
                                                 color = if (sel) Color.White else colores.texto,
                                                 fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
@@ -1247,7 +1212,7 @@ private fun MisCitasTab(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             Brush.horizontalGradient(
                 listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
-            )))
+            ))) {}
         PullToRefreshBox(
             isRefreshing = uiState.isLoading,
             onRefresh = { viewModel.cargarDatosIniciales() },

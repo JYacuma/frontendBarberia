@@ -183,18 +183,55 @@ fun ClienteScreen(
         }   // close ModalDrawerSheet
     }   // close drawerContent
     ) {
-        HorizontalPager(
-            state             = pagerState,
-            modifier          = Modifier.fillMaxSize(),
-            userScrollEnabled = true
-        ) { pagina ->
-            when (pagina) {
-                 0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones,
-                     onNavigateToPerfil = onNavigateToPerfil,
-                     onOpenDrawer = { scope.launch { drawerState.open() } },
-                     onNavigateToInfoBarbero = onNavigateToInfoBarbero)
-                1 -> AgendarTab(uiState, viewModel, colores)
-                 2 -> MisCitasTab(uiState, viewModel, colores)
+        Scaffold(
+            containerColor = colores.fondo,
+            bottomBar = {
+                NavigationBar(
+                    containerColor = colores.superficie,
+                    tonalElevation = 0.dp,
+                    modifier = if (!colores.esModoOscuro) Modifier.shadow(4.dp)
+                    else Modifier.border(1.dp, colores.borde, RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp))
+                ) {
+                    val pages = listOf(
+                        Triple("Inicio",    Icons.Filled.Home,          0),
+                        Triple("Agendar",   Icons.Filled.CalendarMonth, 1),
+                        Triple("Mis Citas", Icons.Filled.ListAlt,       2)
+                    )
+                    pages.forEach { (label, icon, index) ->
+                        val activo = pagerState.currentPage == index
+                        NavigationBarItem(
+                            selected = activo,
+                            onClick  = { scope.launch { pagerState.animateScrollToPage(index) } },
+                            icon = {
+                                Icon(icon, label,
+                                    tint = if (activo) ColorRojo else colores.textoSub,
+                                    modifier = Modifier.size(22.dp))
+                            },
+                            label = {
+                                Text(label, color = if (activo) ColorRojo else colores.textoSub,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (activo) FontWeight.SemiBold else FontWeight.Normal)
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = ColorRojo.copy(alpha = 0.15f))
+                        )
+                    }
+                }
+            }
+        ) { padding ->
+            HorizontalPager(
+                state             = pagerState,
+                modifier          = Modifier.fillMaxSize().padding(padding),
+                userScrollEnabled = true
+            ) { pagina ->
+                when (pagina) {
+                     0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones,
+                         onNavigateToPerfil = onNavigateToPerfil,
+                         onOpenDrawer = { scope.launch { drawerState.open() } },
+                         onNavigateToInfoBarbero = onNavigateToInfoBarbero)
+                    1 -> AgendarTab(uiState, viewModel, colores)
+                     2 -> MisCitasTab(uiState, viewModel, colores)
+                }
             }
         }
     }
@@ -228,7 +265,7 @@ private fun InicioTab(
                 listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
             ))) {}
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(modifier = Modifier.size(44.dp).clip(CircleShape)
@@ -420,6 +457,79 @@ private fun InicioTab(
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(20.dp))
+                    }
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SeccionTituloCliente("Acceso rápido", colores)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Card(
+                                modifier = Modifier.fillMaxWidth()
+                                    .shadow(4.dp, RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        scope.launch { pagerState.animateScrollToPage(1) }
+                                    },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = colores.superficie)
+                            ) {
+                                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Box(modifier = Modifier.size(40.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(ColorRojo.copy(0.1f)),
+                                        contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Filled.CalendarMonth, null,
+                                            tint = ColorRojo, modifier = Modifier.size(20.dp))
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Agendar cita", color = colores.texto,
+                                            fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Text("Elige barbero y servicio",
+                                            color = colores.textoSub, fontSize = 11.sp)
+                                    }
+                                    Icon(Icons.Filled.ArrowForward, null,
+                                        tint = colores.textoSub, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Card(
+                                modifier = Modifier.fillMaxWidth()
+                                    .shadow(4.dp, RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        scope.launch { pagerState.animateScrollToPage(2) }
+                                    },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = colores.superficie)
+                            ) {
+                                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Box(modifier = Modifier.size(40.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(ColorRojo.copy(0.1f)),
+                                        contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Filled.ListAlt, null,
+                                            tint = ColorRojo, modifier = Modifier.size(20.dp))
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Mis citas", color = colores.texto,
+                                            fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Text("Revisa tus citas agendadas",
+                                            color = colores.textoSub, fontSize = 11.sp)
+                                    }
+                                    val pendientes = uiState.citasConDetalles.count {
+                                        it.cita.estado == EstadoCitaEnum.PENDIENTE }
+                                    if (pendientes > 0) {
+                                        Badge(containerColor = ColorRojo) {
+                                            Text("$pendientes", color = Color.White, fontSize = 10.sp)
+                                        }
+                                    }
+                                    Icon(Icons.Filled.ArrowForward, null,
+                                        tint = colores.textoSub, modifier = Modifier.size(20.dp))
                                 }
                             }
                         }
@@ -695,7 +805,7 @@ private fun AgendarTab(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(40.dp))
                 Text("Agendar Cita", color = colores.texto,
                     fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text("Sigue los pasos para reservar", color = colores.textoSub, fontSize = 13.sp)
@@ -1012,6 +1122,12 @@ private fun MisCitasTab(
         }
     }
 
+    val citasPorFecha = remember(citasFiltradas) {
+        citasFiltradas.groupBy { it.cita.fecha ?: "" }
+            .toList()
+            .sortedByDescending { it.first }
+    }
+
     // Dialog cancelar con motivo
     citaParaCancelar?.let { detalle ->
         AlertDialog(
@@ -1224,7 +1340,7 @@ private fun MisCitasTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(40.dp))
                 Text("Mis Citas", color = colores.texto,
                     fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
@@ -1271,22 +1387,39 @@ private fun MisCitasTab(
                     }
                 }
             } else {
-                items(citasFiltradas, key = { it.cita.idCita ?: 0 }) { detalle ->
-                    TarjetaCitaCliente(
-                        detalle    = detalle,
-                        colores    = colores,
-                        onCancelar = {
-                            if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE) {
-                                citaParaCancelar = detalle
-                            }
-                        },
-                        onResena   = {
-                            if (detalle.cita.estado == EstadoCitaEnum.FINALIZADA) {
-                                citaParaResena = detalle.cita
-                            }
-                        },
-                        onClick    = { citaDetalle = detalle }
-                    )
+                citasPorFecha.forEach { (fecha, citasDeFecha) ->
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.weight(1f).height(1.dp)
+                                .background(colores.borde))
+                            Spacer(Modifier.width(10.dp))
+                            Text(fecha, color = ColorRojo,
+                                fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Spacer(Modifier.width(10.dp))
+                            Box(modifier = Modifier.weight(1f).height(1.dp)
+                                .background(colores.borde))
+                        }
+                    }
+                    citasDeFecha.forEach { detalle ->
+                        item(key = detalle.cita.idCita) {
+                            TarjetaCitaCliente(
+                                detalle    = detalle,
+                                colores    = colores,
+                                onCancelar = {
+                                    if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE) {
+                                        citaParaCancelar = detalle
+                                    }
+                                },
+                                onResena   = {
+                                    if (detalle.cita.estado == EstadoCitaEnum.FINALIZADA) {
+                                        citaParaResena = detalle.cita
+                                    }
+                                },
+                                onClick    = { citaDetalle = detalle }
+                            )
+                        }
+                    }
                 }
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }

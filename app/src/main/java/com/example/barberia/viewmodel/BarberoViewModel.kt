@@ -52,6 +52,13 @@ class BarberoViewModel(
 
     fun cargarDatosIniciales() {
         viewModelScope.launch {
+            if (idBarbero == 0L) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "ID de barbero no válido"
+                )
+                return@launch
+            }
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
                 val citasHoy  = apiService.getCitasByBarberoYFecha(idBarbero, fechaHoy)

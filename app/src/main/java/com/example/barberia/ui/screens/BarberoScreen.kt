@@ -82,6 +82,12 @@ fun BarberoScreen(
         }
     }
 
+    LaunchedEffect(idBarbero) {
+        if (idBarbero != 0L) {
+            viewModel.cargarDatosIniciales()
+        }
+    }
+
     val initials = remember(nombre) {
         val ascii = java.text.Normalizer.normalize(nombre, java.text.Normalizer.Form.NFD)
             .replace(Regex("[^\\p{ASCII}]"), "")
@@ -866,14 +872,15 @@ private fun ResenasBarberoTab(
     
             if (grouped.isEmpty()) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().height(180.dp),
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp),
                         contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Icon(Icons.Filled.StarOutline, null,
-                                tint = colores.textoSub, modifier = Modifier.size(48.dp))
-                            Text("Sin reseñas aún",
-                                color = colores.textoSub, fontSize = 15.sp)
+                                tint = colores.textoSub, modifier = Modifier.size(56.dp))
+                            Text("Aún no tienes reseñas",
+                                color = colores.textoSub, fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -1091,34 +1098,22 @@ private fun TarjetaCitaBarbero(
                     .padding(horizontal = 8.dp, vertical = 4.dp)
                     .fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (cita.estado == EstadoCitaEnum.PENDIENTE) {
-                        BotonBarberoAnimado(
-                            text = "Iniciar",
-                            icon = Icons.Filled.PlayArrow,
-                            color = ColorAzul,
-                            colores = colores,
-                            modifier = Modifier.weight(1f),
-                            onClick = onIniciar
-                        )
-                        BotonBarberoAnimado(
-                            text = "No presentó",
-                            icon = Icons.Filled.PersonOff,
-                            color = ColorError,
-                            colores = colores,
-                            modifier = Modifier.weight(1f),
-                            onClick = onNoPresento
-                        )
-                    }
-                    if (cita.estado == EstadoCitaEnum.EN_CURSO) {
-                        BotonBarberoAnimado(
-                            text = "Finalizar",
-                            icon = Icons.Filled.CheckCircle,
-                            color = ColorVerde,
-                            colores = colores,
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = onFinalizar
-                        )
-                    }
+                    BotonBarberoAnimado(
+                        text = "Cita terminada",
+                        icon = Icons.Filled.CheckCircle,
+                        color = ColorVerde,
+                        colores = colores,
+                        modifier = Modifier.weight(1f),
+                        onClick = onFinalizar
+                    )
+                    BotonBarberoAnimado(
+                        text = "No se presentó",
+                        icon = Icons.Filled.PersonOff,
+                        color = ColorError,
+                        colores = colores,
+                        modifier = Modifier.weight(1f),
+                        onClick = onNoPresento
+                    )
                 }
             }
         }

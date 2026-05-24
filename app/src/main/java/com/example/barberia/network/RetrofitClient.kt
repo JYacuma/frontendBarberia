@@ -39,7 +39,7 @@ object RetrofitClient {
     // Interceptor de logs — muestra en Logcat cada request y response
     // Muy útil para depurar qué se envía y qué responde el backend
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = HttpLoggingInterceptor.Level.HEADERS
     }
 
     private val okHttpClient = OkHttpClient.Builder()
@@ -55,7 +55,7 @@ object RetrofitClient {
         .baseUrl(BASE_URL)
         .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create(
-            GsonBuilder().setLenient().create()))
+            GsonBuilder().setLenient().disableHtmlEscaping().create()))
         .build()
 
     // Instancia única de ApiService — se crea una sola vez

@@ -9,12 +9,13 @@ import com.example.barberia.network.ApiService
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 object ClienteBarberoPreseleccion {
-    var idBarbero: Long by mutableStateOf(0L)
+    var barbero: BarberoDTO? by mutableStateOf(null)
 }
 
 data class ClienteUiState(
@@ -37,7 +38,8 @@ data class ClienteUiState(
     val notificaciones: List<NotificacionDTO> = emptyList(),
     val citasConDetalles: List<CitaConDetalle> = emptyList(),
     val barberoHorarios: List<HorarioBarberoDTO> = emptyList(),
-    val barberoAgendarId: Long = 0L
+    val barberoAgendarId: Long = 0L,
+    val barberoPreseleccionado: BarberoDTO? = null
 )
 
 class ClienteViewModel(
@@ -62,17 +64,25 @@ class ClienteViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val barberos       = apiService.getBarberosActivos()
-                val masSolicitados = apiService.getBarberosMasSolicitados()
-                val servicios      = apiService.getServicios()
-                val citas          = apiService.getCitasByUsuario(idUsuario)
-                val perfil         = apiService.getUsuarioById(idUsuario)
-                val promedio       = apiService.getPromedioByUsuarioYBarbero(idUsuario, 0)
+                val barberosDeferred  = async { apiService.getBarberosActivos() }
+                val serviciosDeferred = async { apiService.getServicios() }
+                val citasDeferred     = async { apiService.getCitasByUsuario(idUsuario) }
+                val perfilDeferred    = async { apiService.getUsuarioById(idUsuario) }
+
+                val barberos  = barberosDeferred.await()
+                val servicios = serviciosDeferred.await()
+                val citas     = citasDeferred.await()
+                val perfil    = perfilDeferred.await()
 
                 val barberosList = if (barberos.isSuccessful) barberos.body() ?: emptyList() else emptyList()
-                val masSolicitadosList = if (masSolicitados.isSuccessful) masSolicitados.body() ?: emptyList() else emptyList()
                 val serviciosList = if (servicios.isSuccessful) servicios.body() ?: emptyList() else emptyList()
                 val citasList = if (citas.isSuccessful) citas.body() ?: emptyList() else emptyList()
+
+                val masSolicitadosDeferred = async { apiService.getBarberosMasSolicitados() }
+                val promedioDeferred = async { apiService.getPromedioByUsuarioYBarbero(idUsuario, 0) }
+
+                val masSolicitados = masSolicitadosDeferred.await()
+                val masSolicitadosList = if (masSolicitados.isSuccessful) masSolicitados.body() ?: emptyList() else emptyList()
 
                 val barberosMap = barberosList.associateBy { it.idBarbero }
                 val serviciosMap = serviciosList.associateBy { it.idServicio }
@@ -365,6 +375,10 @@ class ClienteViewModel(
                 }
             } catch (_: Exception) { }
         }
+    }
+
+    fun preseleccionarBarbero(barbero: BarberoDTO?) {
+        _uiState.value = _uiState.value.copy(barberoPreseleccionado = barbero)
     }
 
     fun preseleccionarBarbero(id: Long) {

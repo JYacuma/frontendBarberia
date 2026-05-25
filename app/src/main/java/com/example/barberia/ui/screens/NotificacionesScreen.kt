@@ -30,6 +30,7 @@ import com.example.barberia.ui.theme.LocalBarberiaColores
 @Composable
 fun NotificacionesScreen(
     apiService: ApiService,
+    idUsuario: Long,
     onVolver: () -> Unit
 ) {
     val colores = LocalBarberiaColores.current
@@ -38,7 +39,7 @@ fun NotificacionesScreen(
 
     LaunchedEffect(Unit) {
         try {
-            val citasResponse = apiService.getCitas()
+            val citasResponse = apiService.getCitasByUsuario(idUsuario)
             if (citasResponse.isSuccessful) {
                 val todas = mutableListOf<NotificacionDTO>()
                 for (cita in citasResponse.body() ?: emptyList()) {

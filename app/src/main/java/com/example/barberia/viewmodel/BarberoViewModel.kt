@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.barberia.model.*
 import com.example.barberia.network.ApiService
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -61,15 +62,18 @@ class BarberoViewModel(
             }
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val citasHoy  = apiService.getCitasByBarberoYFecha(idBarbero, fechaHoy)
-                val bloqueos  = apiService.getBloqueosByBarbero(idBarbero)
-                val horarios  = apiService.getHorariosByBarbero(idBarbero)
+                val citasHoyDeferred = async { apiService.getCitasByBarberoYFecha(idBarbero, fechaHoy) }
+                val bloqueosDeferred = async { apiService.getBloqueosByBarbero(idBarbero) }
+                val horariosDeferred = async { apiService.getHorariosByBarbero(idBarbero) }
+                val resenasDeferred  = async { apiService.getResenasByBarbero(idBarbero) }
+
+                val citasHoy  = citasHoyDeferred.await()
+                val bloqueos  = bloqueosDeferred.await()
+                val horarios  = horariosDeferred.await()
+                val resenasResp = resenasDeferred.await()
 
                 val citas = if (citasHoy.isSuccessful) citasHoy.body() ?: emptyList() else emptyList()
-                val resenasList = if (idBarbero != 0L) {
-                    val resenasResp = apiService.getResenasByBarbero(idBarbero)
-                    if (resenasResp.isSuccessful) resenasResp.body() ?: emptyList() else emptyList()
-                } else emptyList()
+                val resenasList = if (resenasResp.isSuccessful) resenasResp.body() ?: emptyList() else emptyList()
                 val bloqueosList = if (bloqueos.isSuccessful) bloqueos.body() ?: emptyList() else emptyList()
                 val horariosList = if (horarios.isSuccessful) horarios.body() ?: emptyList() else emptyList()
 

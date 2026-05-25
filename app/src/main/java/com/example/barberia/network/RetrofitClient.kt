@@ -23,6 +23,15 @@ object RetrofitClient {
         sessionManager = manager
     }
 
+    // Interceptor que fuerza UTF-8 en todas las respuestas — PRIMERO en la cadena
+    private val utf8Interceptor = Interceptor { chain ->
+        val response = chain.proceed(chain.request())
+        val mediaType = response.body?.contentType()
+        val bodyString = response.body?.bytes()?.toString(Charsets.UTF_8) ?: ""
+        val newBody = bodyString.toResponseBody(mediaType)
+        response.newBuilder().body(newBody).build()
+    }
+
     // Interceptor JWT — agrega "Authorization: Bearer <token>" a cada request
     // Si no hay token (usuario no logueado) simplemente no agrega el header
     private val authInterceptor = Interceptor { chain ->
@@ -37,28 +46,13 @@ object RetrofitClient {
         chain.proceed(request)
     }
 
-    // Interceptor que fuerza UTF-8 en todas las respuestas
-    private val charsetInterceptor = Interceptor { chain ->
-        val response = chain.proceed(chain.request())
-        val body = response.body
-        if (body != null) {
-            val source = body.source()
-            source.request(Long.MAX_VALUE)
-            val charset = body.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
-            val bodyString = source.buffer.clone().readString(charset)
-            response.newBuilder()
-                .body(bodyString.toResponseBody(body.contentType()))
-                .build()
-        } else response
-    }
-
     // Interceptor de logs — muestra en Logcat headers de request/response sin alterar el body
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BASIC
     }
 
     private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(charsetInterceptor)
+        .addInterceptor(utf8Interceptor)  // PRIMERO antes de authInterceptor
         .addInterceptor(authInterceptor)
         .addInterceptor(loggingInterceptor)
         // 90 segundos porque Render en plan gratuito tarda 30-60s en despertar

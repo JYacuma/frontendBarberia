@@ -29,6 +29,7 @@ import com.example.barberia.ui.auth.LoginScreen
 import com.example.barberia.ui.auth.RegisterScreen
 import com.example.barberia.ui.screens.AdminScreen
 import com.example.barberia.ui.screens.BarberoScreen
+import com.example.barberia.ui.screens.HistorialResenasScreen
 import com.example.barberia.ui.screens.InfoBarberoScreen
 import com.example.barberia.ui.screens.NotificacionesScreen
 import com.example.barberia.ui.screens.PerfilScreen
@@ -38,16 +39,17 @@ import com.example.barberia.utils.SessionManager
 import kotlinx.coroutines.launch
 
 object Routes {
-    const val LOGIN           = "login"
-    const val REGISTER        = "register"
-    const val CLIENTE_HOME    = "cliente_home"
-    const val BARBERO_HOME    = "barbero_home"
-    const val ADMIN_HOME      = "admin_home"
-    const val SUPERADMIN_HOME = "superadmin_home"
-    const val NOTIFICACIONES  = "notificaciones"
-    const val PERFIL          = "perfil"
-    const val INFO_BARBERO    = "info_barbero/{idBarbero}"
+    const val LOGIN             = "login"
+    const val REGISTER          = "register"
+    const val CLIENTE_HOME      = "cliente_home"
+    const val BARBERO_HOME      = "barbero_home"
+    const val ADMIN_HOME        = "admin_home"
+    const val SUPERADMIN_HOME   = "superadmin_home"
+    const val NOTIFICACIONES    = "notificaciones"
+    const val PERFIL            = "perfil"
+    const val INFO_BARBERO      = "info_barbero/{idBarbero}"
     fun infoBarbero(idBarbero: Long) = "info_barbero/$idBarbero"
+    const val HISTORIAL_RESENAS = "historial_resenas"
 }
 
 class MainActivity : ComponentActivity() {
@@ -156,6 +158,7 @@ class MainActivity : ComponentActivity() {
                                     apiService = RetrofitClient.apiService,
                                     idUsuario  = idUsuario ?: 0L,
                                     nombre     = nombre ?: "Cliente",
+                                    navController = navController,
                                     onLogout   = {
                                         scope.launch {
                                             authRepository.logout()
@@ -170,6 +173,9 @@ class MainActivity : ComponentActivity() {
                                     onNavigateToPerfil = { navController.navigate(Routes.PERFIL) },
                                     onNavigateToInfoBarbero = { idBarbero ->
                                         navController.navigate(Routes.infoBarbero(idBarbero))
+                                    },
+                                    onNavigateToHistorialResenas = {
+                                        navController.navigate(Routes.HISTORIAL_RESENAS)
                                     }
                                 )
                             }
@@ -262,17 +268,27 @@ class MainActivity : ComponentActivity() {
                                 InfoBarberoScreen(
                                     apiService = RetrofitClient.apiService,
                                     idBarbero  = idBarbero,
-                                    onVolver   = { navController.popBackStack() },
-                                    onAgendar  = { id ->
-                                        com.example.barberia.viewmodel.ClienteBarberoPreseleccion.idBarbero = id
-                                        navController.popBackStack()
-                                    }
+                                    navController = navController,
+                                    onVolver   = { navController.popBackStack() }
                                 )
                             }
 
                             composable(Routes.NOTIFICACIONES) {
+                                val idUsuarioNotis by sessionManager.id
+                                    .collectAsStateWithLifecycle(initialValue = 0L)
                                 NotificacionesScreen(
                                     apiService = RetrofitClient.apiService,
+                                    idUsuario  = idUsuarioNotis ?: 0L,
+                                    onVolver   = { navController.popBackStack() }
+                                )
+                            }
+
+                            composable(Routes.HISTORIAL_RESENAS) {
+                                val idUsuarioRes by sessionManager.id
+                                    .collectAsStateWithLifecycle(initialValue = 0L)
+                                HistorialResenasScreen(
+                                    apiService = RetrofitClient.apiService,
+                                    idUsuario  = idUsuarioRes ?: 0L,
                                     onVolver   = { navController.popBackStack() }
                                 )
                             }

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,10 +39,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import com.example.barberia.model.*
 import com.example.barberia.network.ApiService
 import com.example.barberia.ui.theme.*
-import com.example.barberia.viewmodel.ClienteBarberoPreseleccion
+import com.example.barberia.viewmodel.BarberoPendiente
 import com.example.barberia.viewmodel.ClienteViewModel
 import com.example.barberia.viewmodel.ClienteUiState
 
@@ -70,10 +72,12 @@ fun ClienteScreen(
     apiService: ApiService,
     idUsuario: Long,
     nombre: String,
+    navController: NavController,
     onLogout: () -> Unit,
     onNavigateToNotificaciones: () -> Unit = {},
     onNavigateToPerfil: () -> Unit = {},
-    onNavigateToInfoBarbero: (Long) -> Unit = {}
+    onNavigateToInfoBarbero: (Long) -> Unit = {},
+    onNavigateToHistorialResenas: () -> Unit = {}
 ) {
     val viewModel: ClienteViewModel = viewModel(
         key     = "cliente_$idUsuario",
@@ -86,6 +90,30 @@ fun ClienteScreen(
     val scope         = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
     val colores = LocalBarberiaColores.current
+
+    // Estados compartidos entre tabs
+    var citaParaResena by remember { mutableStateOf<CitaDTO?>(null) }
+    var calificacionResena by remember { mutableIntStateOf(5) }
+    var comentarioResena by remember { mutableStateOf("") }
+    var barberoSeleccionadoEnAgendar by remember { mutableStateOf<BarberoDTO?>(null) }
+
+    val navegar = navController.currentBackStackEntry
+        ?.savedStateHandle
+        ?.getStateFlow("navegar_a_agendar", false)
+        ?.collectAsStateWithLifecycle(false)
+
+    LaunchedEffect(navegar?.value) {
+        if (navegar?.value == true) {
+            BarberoPendiente.barbero?.let { barbero ->
+                barberoSeleccionadoEnAgendar = barbero
+            }
+            pagerState.animateScrollToPage(1)
+            navController.currentBackStackEntry
+                ?.savedStateHandle
+                ?.set("navegar_a_agendar", false)
+            BarberoPendiente.barbero = null
+        }
+    }
 
     LaunchedEffect(idUsuario) {
         if (idUsuario != 0L) viewModel.cargarSiUsuarioValido(idUsuario)
@@ -103,19 +131,46 @@ fun ClienteScreen(
             viewModel.clearMessages()
         }
     }
-
-    LaunchedEffect(ClienteBarberoPreseleccion.idBarbero) {
-        val id = ClienteBarberoPreseleccion.idBarbero
-        if (id != 0L) {
-            ClienteBarberoPreseleccion.idBarbero = 0L
-            viewModel.preseleccionarBarbero(id)
-        }
-    }
-
-    LaunchedEffect(uiState.barberoAgendarId) {
-        if (uiState.barberoAgendarId != 0L) {
-            pagerState.animateScrollToPage(1)
-        }
+    // Dialog reseña compartido entre tabs
+    citaParaResena?.let { cita ->
+        AlertDialog(
+            onDismissRequest = { citaParaResena = null },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            title = { Text("Dejar Reseña", color = colores.texto,
+                fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Calificación", color = colores.textoSub, fontSize = 13.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        (1..5).forEach { estrella ->
+                            Icon(
+                                imageVector = if (estrella <= calificacionResena)
+                                    Icons.Filled.Star else Icons.Filled.StarOutline,
+                                contentDescription = null,
+                                tint = ColorDorado,
+                                modifier = Modifier.size(32.dp).clickable {
+                                    calificacionResena = estrella }
+                            )
+                        }
+                    }
+                    BarberiaTextField(comentarioResena, { comentarioResena = it },
+                        "Comentario (opcional)",
+                        Icons.Filled.Comment, ColorRojo, colores)
+                }
+            },
+            confirmButton = {
+                BarberiaBoton("Enviar", colorFondo = ColorRojo, onClick = {
+                    viewModel.enviarResena(cita.idCita!!, cita.idBarbero,
+                        calificacionResena, comentarioResena)
+                    citaParaResena = null; comentarioResena = ""; calificacionResena = 5
+                })
+            },
+            dismissButton = {
+                TextButton(onClick = { citaParaResena = null }) {
+                    Text("Cancelar", color = colores.textoSub) }
+            }
+        )
     }
 
     val initials = remember(nombre) {
@@ -134,8 +189,10 @@ fun ClienteScreen(
                 ), contentAlignment = Alignment.Center) {
                     Column(modifier = Modifier.padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(modifier = Modifier.size(64.dp).clip(CircleShape)
-                            .background(ColorRojo.copy(0.2f)),
+                    Box(modifier = Modifier.size(64.dp).clip(CircleShape)
+                            .background(ColorRojo.copy(0.2f))
+                            .border(2.dp, ColorRojo, CircleShape)
+                            .clickable { scope.launch { drawerState.close() } },
                             contentAlignment = Alignment.Center) {
                             Text(initials, color = ColorRojo,
                                 fontWeight = FontWeight.Bold, fontSize = 24.sp)
@@ -236,9 +293,13 @@ fun ClienteScreen(
                          0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones,
                              onNavigateToPerfil = onNavigateToPerfil,
                              onOpenDrawer = { scope.launch { drawerState.open() } },
-                             onNavigateToInfoBarbero = onNavigateToInfoBarbero)
-                        1 -> AgendarTab(uiState, viewModel, colores)
-                         2 -> MisCitasTab(uiState, viewModel, colores)
+                             onNavigateToInfoBarbero = onNavigateToInfoBarbero,
+                             onDejarResena = { citaParaResena = it })
+                         1 -> AgendarTab(uiState, viewModel, colores,
+                             barberoInicial = barberoSeleccionadoEnAgendar)
+                         2 -> MisCitasTab(uiState, viewModel, colores,
+                             onDejarResena = { citaParaResena = it },
+                             onNavigateToHistorialResenas = onNavigateToHistorialResenas)
                     }
                 }
             }
@@ -261,7 +322,8 @@ private fun InicioTab(
     onNavigateToNotificaciones: () -> Unit,
     onNavigateToPerfil: () -> Unit = {},
     onOpenDrawer: () -> Unit = {},
-    onNavigateToInfoBarbero: (Long) -> Unit = {}
+    onNavigateToInfoBarbero: (Long) -> Unit = {},
+    onDejarResena: (CitaDTO) -> Unit = {}
 ) {
     val initials = remember(nombre) {
         val ascii = Normalizer.normalize(nombre, Normalizer.Form.NFD)
@@ -440,73 +502,45 @@ private fun InicioTab(
                         Spacer(modifier = Modifier.height(20.dp))
                     }
                     item {
-                        Column(modifier = Modifier.padding(horizontal = 20.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            SeccionTituloCliente("Acceso rápido", colores)
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Card(
-                                modifier = Modifier.fillMaxWidth()
-                                    .shadow(4.dp, RoundedCornerShape(14.dp))
-                                    .clickable {
-                                        scope.launch { pagerState.animateScrollToPage(1) }
-                                    },
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(containerColor = colores.superficie)
-                            ) {
-                                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically) {
-                                    Box(modifier = Modifier.size(40.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(ColorRojo.copy(0.1f)),
-                                        contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Filled.CalendarMonth, null,
-                                            tint = ColorRojo, modifier = Modifier.size(20.dp))
-                                    }
-                                    Spacer(Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("Agendar cita", color = colores.texto,
-                                            fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                        Text("Elige barbero y servicio",
-                                            color = colores.textoSub, fontSize = 11.sp)
-                                    }
-                                    Icon(Icons.Filled.ArrowForward, null,
-                                        tint = colores.textoSub, modifier = Modifier.size(20.dp))
+                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                            val citasResena = uiState.citasConDetalles.filter {
+                                it.cita.estado == EstadoCitaEnum.FINALIZADA
+                            }.take(3)
+                            SeccionTituloCliente("Reseña tus citas", colores)
+                            Spacer(modifier = Modifier.height(10.dp))
+                            if (citasResena.isEmpty()) {
+                                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Filled.StarOutline, null,
+                                        tint = colores.textoSub, modifier = Modifier.size(48.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("No tienes citas pendientes de reseña",
+                                        color = colores.textoSub, fontSize = 14.sp)
                                 }
-                            }
-                            Card(
-                                modifier = Modifier.fillMaxWidth()
-                                    .shadow(4.dp, RoundedCornerShape(14.dp))
-                                    .clickable {
-                                        scope.launch { pagerState.animateScrollToPage(2) }
-                                    },
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(containerColor = colores.superficie)
-                            ) {
-                                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically) {
-                                    Box(modifier = Modifier.size(40.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(ColorRojo.copy(0.1f)),
-                                        contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Filled.ListAlt, null,
-                                            tint = ColorRojo, modifier = Modifier.size(20.dp))
-                                    }
-                                    Spacer(Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("Mis citas", color = colores.texto,
-                                            fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                        Text("Revisa tus citas agendadas",
-                                            color = colores.textoSub, fontSize = 11.sp)
-                                    }
-                                    val pendientes = uiState.citasConDetalles.count {
-                                        it.cita.estado == EstadoCitaEnum.PENDIENTE }
-                                    if (pendientes > 0) {
-                                        Badge(containerColor = ColorRojo) {
-                                            Text("$pendientes", color = Color.White, fontSize = 10.sp)
+                            } else {
+                                citasResena.forEach { detalle ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth()
+                                            .shadow(4.dp, RoundedCornerShape(14.dp)),
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(containerColor = colores.superficie)
+                                    ) {
+                                        Row(modifier = Modifier.padding(14.dp).fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(detalle.barberoNombre, color = colores.texto,
+                                                    fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                Text(detalle.cita.fecha ?: "",
+                                                    color = colores.textoSub, fontSize = 12.sp)
+                                            }
+                                            TextButton(onClick = {
+                                                onDejarResena(detalle.cita)
+                                            }) {
+                                                Text("Dejar reseña", color = ColorRojo, fontSize = 13.sp)
+                                            }
                                         }
                                     }
-                                    Icon(Icons.Filled.ArrowForward, null,
-                                        tint = colores.textoSub, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
                                 }
                             }
                         }
@@ -526,7 +560,8 @@ private fun InicioTab(
 private fun AgendarTab(
     uiState: ClienteUiState,
     viewModel: ClienteViewModel,
-    colores: BarberiaColores
+    colores: BarberiaColores,
+    barberoInicial: BarberoDTO? = null
 ) {
     var pasoAgenda            by remember { mutableIntStateOf(0) }
     var barberoSeleccionado   by remember { mutableStateOf<BarberoDTO?>(null) }
@@ -541,16 +576,11 @@ private fun AgendarTab(
     var expandidoEspecialidad by remember { mutableStateOf(false) }
     var expandidoServicio     by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.barberoAgendarId) {
-        val id = uiState.barberoAgendarId
-        if (id != 0L) {
-            viewModel.preseleccionarBarbero(0L)
-            val barbero = uiState.barberos.find { it.idBarbero == id }
-                ?: uiState.popularBarberos.find { it.idBarbero == id }
-            if (barbero != null) {
-                barberoSeleccionado = barbero
-                pasoAgenda = 1
-            }
+    LaunchedEffect(barberoInicial) {
+        barberoInicial?.let { barbero ->
+            barberoSeleccionado = barbero
+            pasoAgenda = 1
+            barbero.idBarbero?.let { viewModel.cargarHorariosBarbero(it) }
         }
     }
 
@@ -780,7 +810,7 @@ private fun AgendarTab(
                 item {
                     Spacer(modifier = Modifier.height(12.dp))
                 Text("Agendar Cita", color = colores.texto,
-                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 Text("Sigue los pasos para reservar", color = colores.textoSub, fontSize = 13.sp)
             }
 
@@ -1039,15 +1069,14 @@ private fun AgendarTab(
 private fun MisCitasTab(
     uiState: ClienteUiState,
     viewModel: ClienteViewModel,
-    colores: BarberiaColores
+    colores: BarberiaColores,
+    onDejarResena: (CitaDTO) -> Unit = {},
+    onNavigateToHistorialResenas: () -> Unit = {}
 ) {
     var filtroEstado by remember { mutableStateOf<String?>(null) }
     var citaParaCancelar by remember { mutableStateOf<CitaConDetalle?>(null) }
     var motivoCancelacion by remember { mutableStateOf("") }
     var mostrarCancelada by remember { mutableStateOf(false) }
-    var citaParaResena by remember { mutableStateOf<CitaDTO?>(null) }
-    var calificacion   by remember { mutableStateOf(5) }
-    var comentario     by remember { mutableStateOf("") }
     var citaDetalle by remember { mutableStateOf<CitaConDetalle?>(null) }
 
     val motivos = listOf(
@@ -1160,47 +1189,7 @@ private fun MisCitasTab(
         )
     }
 
-    // Dialog reseña
-    citaParaResena?.let { cita ->
-        AlertDialog(
-            onDismissRequest = { citaParaResena = null },
-            containerColor   = colores.superficie,
-            shape            = RoundedCornerShape(20.dp),
-            title = { Text("Dejar Reseña", color = colores.texto,
-                fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Calificación", color = colores.textoSub, fontSize = 13.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        (1..5).forEach { estrella ->
-                            Icon(
-                                imageVector = if (estrella <= calificacion)
-                                    Icons.Filled.Star else Icons.Filled.StarOutline,
-                                contentDescription = null,
-                                tint = ColorDorado,
-                                modifier = Modifier.size(32.dp).clickable {
-                                    calificacion = estrella }
-                            )
-                        }
-                    }
-                    BarberiaTextField(comentario, { comentario = it },
-                        "Comentario (opcional)",
-                        Icons.Filled.Comment, ColorRojo, colores)
-                }
-            },
-            confirmButton = {
-                BarberiaBoton("Enviar", colorFondo = ColorRojo, onClick = {
-                    viewModel.enviarResena(cita.idCita!!, cita.idBarbero,
-                        calificacion, comentario)
-                    citaParaResena = null; comentario = ""; calificacion = 5
-                })
-            },
-            dismissButton = {
-                TextButton(onClick = { citaParaResena = null }) {
-                    Text("Cancelar", color = colores.textoSub) }
-            }
-        )
-    }
+    // Dialog reseña — ahora se maneja desde ClienteScreen
 
     // Dialog detalle cita
     citaDetalle?.let { detalle ->
@@ -1253,7 +1242,7 @@ private fun MisCitasTab(
                 @Composable {
                     BarberiaBoton("Dejar reseña", onClick = {
                         citaDetalle = null
-                        citaParaResena = detalle.cita
+                        onDejarResena(detalle.cita)
                     })
                 }
             } else {
@@ -1290,7 +1279,7 @@ private fun MisCitasTab(
                 item {
                     Spacer(modifier = Modifier.height(12.dp))
                 Text("Mis Citas", color = colores.texto,
-                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Chips de filtro
@@ -1361,7 +1350,7 @@ private fun MisCitasTab(
                                 },
                                 onResena   = {
                                     if (detalle.cita.estado == EstadoCitaEnum.FINALIZADA) {
-                                        citaParaResena = detalle.cita
+                                        onDejarResena(detalle.cita)
                                     }
                                 },
                                 onClick    = { citaDetalle = detalle }
@@ -1371,6 +1360,17 @@ private fun MisCitasTab(
                 }
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }
+            item {
+                OutlinedButton(
+                    onClick = onNavigateToHistorialResenas,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
+                ) {
+                    Icon(Icons.Filled.Star, null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Ver historial de reseñas")
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
         }
     }
     }

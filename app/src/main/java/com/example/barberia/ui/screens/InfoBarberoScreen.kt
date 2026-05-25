@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.example.barberia.model.BarberoDTO
 import com.example.barberia.model.ResenaDTO
 import com.example.barberia.network.ApiService
@@ -56,13 +57,14 @@ import com.example.barberia.ui.theme.ColorDorado
 import com.example.barberia.ui.theme.ColorRojo
 import com.example.barberia.ui.theme.ColorVerde
 import com.example.barberia.ui.theme.LocalBarberiaColores
+import com.example.barberia.viewmodel.BarberoPendiente
 
 @Composable
 fun InfoBarberoScreen(
     apiService: ApiService,
     idBarbero: Long,
-    onVolver: () -> Unit,
-    onAgendar: (Long) -> Unit
+    navController: NavController,
+    onVolver: () -> Unit
 ) {
     val colores = LocalBarberiaColores.current
     var barbero by remember { mutableStateOf<BarberoDTO?>(null) }
@@ -197,7 +199,15 @@ fun InfoBarberoScreen(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
-                    onClick = { onAgendar(idBarbero) },
+                    onClick = {
+                        data?.let { barberoActual ->
+                            BarberoPendiente.barbero = barberoActual
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set("navegar_a_agendar", true)
+                            navController.popBackStack()
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = ColorRojo)

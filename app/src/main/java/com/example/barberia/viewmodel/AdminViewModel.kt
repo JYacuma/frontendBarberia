@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.barberia.model.*
 import com.example.barberia.network.ApiService
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -52,11 +53,17 @@ class AdminViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val citasResponse = apiService.getCitas()
-                val barberosResponse = apiService.getBarberos()
-                val serviciosResponse = apiService.getServicios()
-                val barberosUsersResponse = apiService.getUsuariosByRol("BARBERO")
-                val usuariosResponse = apiService.getUsuarios()
+                val citasDeferred = async { apiService.getCitas() }
+                val barberosDeferred = async { apiService.getBarberos() }
+                val serviciosDeferred = async { apiService.getServicios() }
+                val barberosUsersDeferred = async { apiService.getUsuariosByRol("BARBERO") }
+                val usuariosDeferred = async { apiService.getUsuarios() }
+
+                val citasResponse = citasDeferred.await()
+                val barberosResponse = barberosDeferred.await()
+                val serviciosResponse = serviciosDeferred.await()
+                val barberosUsersResponse = barberosUsersDeferred.await()
+                val usuariosResponse = usuariosDeferred.await()
 
                 val todasLasCitas = if (citasResponse.isSuccessful) citasResponse.body() ?: emptyList() else emptyList()
                 val barberos = if (barberosResponse.isSuccessful) barberosResponse.body() ?: emptyList() else emptyList()

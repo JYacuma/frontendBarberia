@@ -336,39 +336,11 @@ private fun InicioTab(
                                 contentPadding = PaddingValues(horizontal = 20.dp)
                             ) {
                                 items(barberosMostrar, key = { it.idBarbero ?: 0 }) { barbero ->
-                                    Card(
-                                        modifier = Modifier
-                                            .width(110.dp)
-                                            .shadow(4.dp, RoundedCornerShape(16.dp))
-                                            .clickable {
-                                                onNavigateToInfoBarbero(barbero.idBarbero ?: 0L)
-                                            },
-                                        shape = RoundedCornerShape(16.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = colores.superficie)
-                                    ) {
-                                        Column(modifier = Modifier.padding(12.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(14.dp))
-                                                .background(ColorRojo.copy(0.15f))
-                                                .border(1.5.dp, ColorRojo.copy(0.3f), RoundedCornerShape(14.dp)),
-                                                contentAlignment = Alignment.Center) {
-                                                Text(barbero.nombre.take(2).uppercase(),
-                                                    color = ColorRojo,
-                                                    fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                                            }
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            Text(barbero.nombre, color = colores.texto,
-                                                fontSize = 13.sp, textAlign = TextAlign.Center,
-                                                fontWeight = FontWeight.Medium,
-                                                maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            barbero.especialidad?.let {
-                                                Text(it, color = colores.textoSub,
-                                                    fontSize = 10.sp, textAlign = TextAlign.Center,
-                                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            }
-                                        }
-                                    }
+                                    TarjetaBarberoCliente(
+                                        barbero = barbero,
+                                        colores = colores,
+                                        onClick = { onNavigateToInfoBarbero(barbero.idBarbero ?: 0L) }
+                                    )
                                 }
                             }
                         }
@@ -863,40 +835,15 @@ private fun AgendarTab(
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(barberosFiltrados, key = { it.idBarbero ?: 0 }) { barbero ->
                             val seleccionado = barberoSeleccionado?.idBarbero == barbero.idBarbero
-                            Card(
-                                modifier = Modifier.width(110.dp)
-                                    .height(IntrinsicSize.Min)
-                                    .shadow(4.dp, RoundedCornerShape(14.dp))
-                                    .clickable {
-                                        barberoSeleccionado = barbero
-                                        viewModel.cargarHorariosBarbero(barbero.idBarbero!!)
-                                    },
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (seleccionado) ColorRojo else colores.superficie)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Box(modifier = Modifier.size(44.dp).clip(CircleShape)
-                                        .background(if (seleccionado) Color.White.copy(0.2f) else ColorRojo.copy(0.15f)),
-                                        contentAlignment = Alignment.Center) {
-                                        Text(barbero.nombre.take(2).uppercase(),
-                                            color = if (seleccionado) Color.White else ColorRojo,
-                                            fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    }
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(barbero.nombre,
-                                        color = if (seleccionado) Color.White else colores.texto,
-                                        fontSize = 12.sp, textAlign = TextAlign.Center,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    barbero.especialidad?.let {
-                                        Text(it,
-                                            color = if (seleccionado) Color.White.copy(0.7f) else colores.textoSub,
-                                            fontSize = 10.sp, textAlign = TextAlign.Center,
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
+                            TarjetaBarberoCliente(
+                                barbero = barbero,
+                                colores = colores,
+                                seleccionado = seleccionado,
+                                onClick = {
+                                    barberoSeleccionado = barbero
+                                    viewModel.cargarHorariosBarbero(barbero.idBarbero!!)
                                 }
-                            }
+                            )
                         }
                     }
                 }
@@ -1666,5 +1613,64 @@ private fun PasoTituloCliente(texto: String, colores: BarberiaColores) {
     Text(texto, color = colores.textoSub, fontSize = 13.sp, letterSpacing = 0.5.sp)
 }
 
+@Composable
+private fun TarjetaBarberoCliente(
+    barbero: BarberoDTO,
+    colores: BarberiaColores,
+    seleccionado: Boolean = false,
+    onClick: () -> Unit = {}
+) {
+    val bgColor = if (seleccionado) ColorRojo else colores.superficie
+    val txtColor = if (seleccionado) Color.White else colores.texto
+    val subColor = if (seleccionado) Color.White.copy(0.7f) else colores.textoSub
+    val avatarBg = if (seleccionado) Color.White.copy(0.2f) else ColorRojo.copy(0.2f)
+    val inicialColor = if (seleccionado) Color.White else ColorRojo
+    Card(
+        modifier = Modifier
+            .width(110.dp)
+            .height(150.dp)
+            .shadow(4.dp, RoundedCornerShape(16.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(avatarBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    barbero.nombre.take(2).uppercase(),
+                    color = inicialColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                barbero.nombre,
+                color = txtColor,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                barbero.especialidad ?: "",
+                color = subColor,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
 
 

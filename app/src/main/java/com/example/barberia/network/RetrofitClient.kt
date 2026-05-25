@@ -51,11 +51,15 @@ object RetrofitClient {
         .writeTimeout(90, TimeUnit.SECONDS)
         .build()
 
+    private val gson = GsonBuilder()
+        .setLenient()
+        .disableHtmlEscaping()
+        .create()
+
     private val retrofit = Retrofit.Builder()
         .baseUrl(BASE_URL)
         .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create(
-            GsonBuilder().setLenient().disableHtmlEscaping().create()))
+        .addConverterFactory(GsonConverterFactory.create(gson))
         .build()
 
     // Instancia única de ApiService — se crea una sola vez

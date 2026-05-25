@@ -41,7 +41,9 @@ data class ClienteUiState(
     val citasConDetalles: List<CitaConDetalle> = emptyList(),
     val barberoHorarios: List<HorarioBarberoDTO> = emptyList(),
     val barberoAgendarId: Long = 0L,
-    val barberoPreseleccionado: BarberoDTO? = null
+    val barberoPreseleccionado: BarberoDTO? = null,
+    val enviandoResena: Boolean = false,
+    val resenaExitosa: Boolean = false
 )
 
 class ClienteViewModel(
@@ -118,7 +120,7 @@ class ClienteViewModel(
                     citas                  = citasList,
                     citasConDetalles       = citasConDetalles,
                     perfil                 = if (perfil.isSuccessful) perfil.body() else null,
-                    notificaciones         = allNotificaciones
+                    notificaciones         = allNotificaciones.sortedByDescending { it.fechaEnvio }
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -183,6 +185,10 @@ class ClienteViewModel(
 
     fun limpiarDisponibilidad() {
         _uiState.value = _uiState.value.copy(horasDisponibles = emptyList())
+    }
+
+    fun limpiarResenaExitosa() {
+        _uiState.value = _uiState.value.copy(resenaExitosa = false)
     }
 
     fun agendarCita(idBarbero: Long, idServicio: Long, fecha: String, horaInicio: String) {
@@ -259,28 +265,38 @@ class ClienteViewModel(
 
     fun enviarResena(idCita: Long, idBarbero: Long, calificacion: Int, comentario: String) {
         if (idUsuario == 0L) return
+        Log.d("RESENA", "Enviando: idCita=$idCita, idBarbero=$idBarbero, idUsuario=$idUsuario, cal=$calificacion, comentario=$comentario")
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(enviandoResena = true)
             try {
-                val ahora = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(Date())
                 val response = apiService.createResena(
                     ResenaRequest(
                         idCita       = idCita,
                         idUsuario    = idUsuario,
                         idBarbero    = idBarbero,
                         calificacion = calificacion,
-                        comentario   = comentario.ifBlank { null },
-                        fecha        = ahora
+                        comentario   = comentario.ifBlank { null }
                     )
                 )
                 if (response.isSuccessful) {
-                    _uiState.value = _uiState.value.copy(successMessage = "¡Reseña enviada!")
+                    _uiState.value = _uiState.value.copy(
+                        enviandoResena  = false,
+                        resenaExitosa   = true,
+                        successMessage  = "¡Reseña enviada!"
+                    )
                     cargarDatosIniciales()
                 } else {
+                    val errorBody = response.errorBody()?.string() ?: "Error ${response.code()}"
                     _uiState.value = _uiState.value.copy(
-                        errorMessage = "Error al enviar reseña (${response.code()})")
+                        enviandoResena = false,
+                        errorMessage   = "Error al enviar reseña: $errorBody"
+                    )
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(errorMessage = "Error al enviar reseña")
+                _uiState.value = _uiState.value.copy(
+                    enviandoResena = false,
+                    errorMessage   = "Sin conexión: ${e.message}"
+                )
             }
         }
     }
@@ -392,6 +408,25 @@ class ClienteViewModel(
 
     fun clearMessages() {
         _uiState.value = _uiState.value.copy(errorMessage = null, successMessage = null)
+    }
+
+    fun cargarNotificaciones(citas: List<CitaDTO>) {
+        viewModelScope.launch {
+            val todas = mutableListOf<NotificacionDTO>()
+            citas.forEach { cita ->
+                cita.idCita?.let { idCita ->
+                    try {
+                        val response = apiService.getNotificacionesByCita(idCita)
+                        if (response.isSuccessful) {
+                            todas.addAll(response.body() ?: emptyList())
+                        }
+                    } catch (_: Exception) { }
+                }
+            }
+            _uiState.value = _uiState.value.copy(
+                notificaciones = todas.sortedByDescending { it.fechaEnvio }
+            )
+        }
     }
 
     companion object {

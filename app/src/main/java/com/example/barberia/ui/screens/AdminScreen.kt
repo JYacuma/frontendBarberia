@@ -2095,15 +2095,18 @@ private fun AdminStatCard(
     onClick: (() -> Unit)? = null
 ) {
     Card(modifier = modifier
+        .aspectRatio(1f)
         .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
-        Column(modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(numero, color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text(label, color = colores.textoSub, fontSize = 11.sp,
+        Column(modifier = Modifier.fillMaxSize().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center) {
+            Text(numero, color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center)
+            Text(label, color = colores.textoSub, fontSize = 11.sp,
+                textAlign = TextAlign.Center, maxLines = 2)
         }
     }
 }

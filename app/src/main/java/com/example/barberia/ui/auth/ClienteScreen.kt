@@ -96,6 +96,7 @@ fun ClienteScreen(
     var calificacionResena by remember { mutableIntStateOf(5) }
     var comentarioResena by remember { mutableStateOf("") }
     var barberoSeleccionadoEnAgendar by remember { mutableStateOf<BarberoDTO?>(null) }
+    var showResenaExitosa by remember { mutableStateOf(false) }
 
     val navegar = navController.currentBackStackEntry
         ?.savedStateHandle
@@ -121,7 +122,11 @@ fun ClienteScreen(
 
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {
-            snackbarState.showSnackbar(it)
+            if (it == "¡Reseña enviada!") {
+                showResenaExitosa = true
+            } else {
+                snackbarState.showSnackbar(it)
+            }
             viewModel.clearMessages()
         }
     }
@@ -130,6 +135,9 @@ fun ClienteScreen(
             snackbarState.showSnackbar(it)
             viewModel.clearMessages()
         }
+    }
+    LaunchedEffect(uiState.resenaExitosa) {
+        if (uiState.resenaExitosa) showResenaExitosa = true
     }
     // Dialog reseña compartido entre tabs
     citaParaResena?.let { cita ->
@@ -169,6 +177,22 @@ fun ClienteScreen(
             dismissButton = {
                 TextButton(onClick = { citaParaResena = null }) {
                     Text("Cancelar", color = colores.textoSub) }
+            }
+        )
+    }
+
+    if (showResenaExitosa) {
+        AlertDialog(
+            onDismissRequest = { showResenaExitosa = false; viewModel.limpiarResenaExitosa() },
+            containerColor   = colores.superficie,
+            shape            = RoundedCornerShape(20.dp),
+            icon = { Icon(Icons.Filled.Star, null, tint = ColorDorado, modifier = Modifier.size(48.dp)) },
+            title = { Text("¡Gracias por tu reseña!", color = colores.texto, fontWeight = FontWeight.Bold) },
+            text = { Text("Tu opinión ha sido registrada correctamente.", color = colores.textoSub) },
+            confirmButton = {
+                TextButton(onClick = { showResenaExitosa = false; viewModel.limpiarResenaExitosa() }) {
+                    Text("Aceptar", color = ColorRojo)
+                }
             }
         )
     }

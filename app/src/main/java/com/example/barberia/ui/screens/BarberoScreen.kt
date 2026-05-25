@@ -2,6 +2,7 @@ package com.example.barberia.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -84,6 +85,7 @@ fun BarberoScreen(
 
     LaunchedEffect(idBarbero) {
         if (idBarbero != 0L) {
+            viewModel.actualizarIdBarbero(idBarbero)
             viewModel.cargarDatosIniciales()
         }
     }
@@ -193,7 +195,7 @@ fun BarberoScreen(
                              onOpenDrawer = { scope.launch { drawerState.open() } })
                         1 -> AgendaTab(uiState, viewModel, colores)
                         2 -> ResenasBarberoTab(uiState, colores)
-                        3 -> HorariosBarberoTab(uiState, colores)
+                         3 -> HorariosBarberoTab(uiState, viewModel, colores)
                     }
                 }
             }
@@ -531,8 +533,9 @@ private fun HoyTab(
                     items(citasFiltradas) { cita ->
                         Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
                             TarjetaCitaBarbero(
-                                cita    = cita,
-                                colores = colores,
+                                cita     = cita,
+                                colores  = colores,
+                                uiState  = uiState,
                                 onClick = {
                                     citaDetalle = uiState.citasConDetalle.find {
                                         it.cita.idCita == cita.idCita
@@ -541,7 +544,8 @@ private fun HoyTab(
                                 },
                                 onIniciar    = { citaAccion = cita; tipoAccion = "iniciar" },
                                 onFinalizar  = { citaAccion = cita; tipoAccion = "finalizar" },
-                                onNoPresento = { citaAccion = cita; tipoAccion = "nopresento" }
+                                onNoPresento = { citaAccion = cita; tipoAccion = "nopresento" },
+                                onCancelar   = { citaAccion = cita; tipoAccion = "cancelar" }
                             )
                         }
                     }
@@ -559,6 +563,8 @@ private fun HoyTab(
                 "¿Confirmas que terminaste la cita #${cita.idCita}?", ColorVerde)
             "nopresento" -> Triple("No se presentó",
                 "¿El cliente de la cita #${cita.idCita} no se presentó?", ColorError)
+            "cancelar"   -> Triple("Cancelar cita",
+                "¿Estás seguro de cancelar la cita #${cita.idCita}?", ColorError)
             else -> Triple("", "", ColorAzul)
         }
         AlertDialog(
@@ -576,6 +582,7 @@ private fun HoyTab(
                             "iniciar"    -> viewModel.iniciarCita(cita.idCita!!)
                             "finalizar"  -> viewModel.finalizarCita(cita.idCita!!)
                             "nopresento" -> viewModel.marcarNoPresento(cita.idCita!!)
+                            "cancelar"   -> viewModel.cancelarCita(cita.idCita!!)
                         }
                         citaAccion = null
                     }
@@ -661,26 +668,118 @@ private fun FilaDetalle(label: String, valor: String, colores: BarberiaColores) 
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TAB 1 — AGENDA (descanso y citas de hoy)
+// TAB 1 — AGENDA con citas por día de la semana
 // ══════════════════════════════════════════════════════════════════════════════
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AgendaTab(
     uiState: com.example.barberia.viewmodel.BarberoUiState,
     viewModel: BarberoViewModel,
     colores: BarberiaColores
 ) {
-    var showDialog by remember { mutableStateOf(false) }
-    var selectedDay by remember { mutableStateOf<String?>(null) }
-    var selectedBlock by remember { mutableStateOf<String?>(null) }
-
-    val bloques30 = remember {
-        val blocks = mutableListOf<String>()
-        for (h in 9 until 19) {
-            blocks.add("%02d:00-%02d:30".format(h, h))
-            blocks.add("%02d:30-%02d:00".format(h, h + 1))
+    val diasSemana = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+    val cal = remember { java.util.Calendar.getInstance() }
+    val todayIndex = remember { (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7 }
+    val diasConFecha = remember {
+        val cal2 = java.util.Calendar.getInstance()
+        val hoy = cal2.get(java.util.Calendar.DAY_OF_WEEK)
+        val lunesOffset = (hoy + 5) % 7
+        (0..6).map { i ->
+            val c = java.util.Calendar.getInstance()
+            c.add(java.util.Calendar.DAY_OF_MONTH, i - lunesOffset)
+            val fecha = "%d-%02d-%02d".format(
+                c.get(java.util.Calendar.YEAR),
+                c.get(java.util.Calendar.MONTH) + 1,
+                c.get(java.util.Calendar.DAY_OF_MONTH)
+            )
+            Pair(diasSemana[i], fecha)
         }
-        blocks
+    }
+    var diaSeleccionado by remember { mutableStateOf<String?>(diasConFecha[todayIndex].second) }
+    var citasDelDia by remember { mutableStateOf<List<CitaDTO>>(emptyList()) }
+    var cargando by remember { mutableStateOf(false) }
+    var accionConfirmar by remember { mutableStateOf<Pair<Long?, String>?>(null) }
+    var citaDetalle by remember { mutableStateOf<CitaDTO?>(null) }
+
+    fun getFechaParaIndice(indice: Int): String {
+        val c = java.util.Calendar.getInstance()
+        c.add(java.util.Calendar.DAY_OF_MONTH, indice - todayIndex)
+        return "%d-%02d-%02d".format(
+            c.get(java.util.Calendar.YEAR),
+            c.get(java.util.Calendar.MONTH) + 1,
+            c.get(java.util.Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    LaunchedEffect(diaSeleccionado) {
+        val fecha = diaSeleccionado ?: return@LaunchedEffect
+        cargando = true
+        try {
+            val resp = viewModel.obtenerCitasPorFecha(fecha)
+            if (resp.isSuccessful) {
+                citasDelDia = resp.body() ?: emptyList()
+            } else citasDelDia = emptyList()
+        } catch (_: Exception) { citasDelDia = emptyList() }
+        cargando = false
+    }
+
+    accionConfirmar?.let { (idCita, accion) ->
+        val (titulo, mensaje, color) = when (accion) {
+            "finalizar"  -> Triple("Finalizar cita", "¿Confirmas que terminaste la cita?", ColorVerde)
+            "nopresento" -> Triple("No se presentó", "¿El cliente no se presentó?", ColorError)
+            else -> Triple("", "", ColorAzul)
+        }
+        AlertDialog(
+            onDismissRequest = { accionConfirmar = null },
+            containerColor = colores.superficie,
+            shape = RoundedCornerShape(20.dp),
+            title = { Text(titulo, color = colores.texto, fontWeight = FontWeight.Bold) },
+            text = { Text(mensaje, color = colores.textoSub) },
+            confirmButton = {
+                TextButton(onClick = {
+                    when (accion) {
+                        "finalizar"  -> viewModel.finalizarCita(idCita!!)
+                        "nopresento" -> viewModel.marcarNoPresento(idCita!!)
+                    }
+                    accionConfirmar = null
+                }) { Text("Confirmar", color = color) }
+            },
+            dismissButton = {
+                TextButton(onClick = { accionConfirmar = null }) { Text("Cancelar", color = colores.textoSub) }
+            }
+        )
+    }
+
+    citaDetalle?.let { cita ->
+        val nomCliente = uiState.mapaUsuarios[cita.idUsuario] ?: "Cliente #${cita.idUsuario}"
+        val nomServicio = uiState.mapaServicios[cita.idServicio] ?: "Servicio #${cita.idServicio}"
+        val estadoTxt = when (cita.estado) {
+            EstadoCitaEnum.PENDIENTE -> "Pendiente"
+            EstadoCitaEnum.EN_CURSO -> "En curso"
+            EstadoCitaEnum.FINALIZADA -> "Finalizada"
+            EstadoCitaEnum.CANCELADA -> "Cancelada"
+            EstadoCitaEnum.NO_PRESENTADO -> "No se presentó"
+            null -> "--"
+        }
+        AlertDialog(
+            onDismissRequest = { citaDetalle = null },
+            containerColor = colores.superficie,
+            shape = RoundedCornerShape(20.dp),
+            title = { Text("Cita #${cita.idCita}", color = colores.texto, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilaDetalle("Cliente", nomCliente, colores)
+                    FilaDetalle("Servicio", nomServicio, colores)
+                    FilaDetalle("Fecha", cita.fecha ?: "--", colores)
+                    FilaDetalle("Hora", "${cita.horaInicio?.take(5) ?: "--:--"} - ${cita.horaFin?.take(5) ?: "--:--"}", colores)
+                    FilaDetalle("Estado", estadoTxt, colores)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { citaDetalle = null }) {
+                    Text("Cerrar", color = ColorAzul)
+                }
+            }
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize().background(colores.fondo)) {
@@ -689,109 +788,112 @@ private fun AgendaTab(
             onRefresh = { viewModel.cargarDatosIniciales() },
             modifier = Modifier.weight(1f)
         ) {
-            Column(
+            LazyColumn(
                 modifier = Modifier.padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Agenda", color = colores.texto, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    Text("Agenda", color = colores.texto, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                }
 
-                Button(
-                    onClick = { showDialog = true },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ColorAzul)
-                ) {
-                    Icon(Icons.Filled.Lock, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Organizar descanso", fontWeight = FontWeight.SemiBold)
-                }
-    
-                if (showDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showDialog = false; selectedDay = null; selectedBlock = null },
-                        containerColor = colores.superficie,
-                        shape = RoundedCornerShape(20.dp),
-                        title = {
-                            Text("Selecciona día y bloque de descanso",
-                                color = colores.texto, fontWeight = FontWeight.Bold)
-                        },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text("Día", color = colores.texto, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                    listOf("LUNES","MARTES","MIERCOLES","JUEVES","VIERNES","SABADO","DOMINGO").forEach { dia ->
-                                        FilterChip(
-                                            selected = selectedDay == dia,
-                                            onClick = { selectedDay = if (selectedDay == dia) null else dia },
-                                            label = { Text(dia.take(3), fontSize = 11.sp) },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = ColorAzul, selectedLabelColor = Color.White
-                                            )
-                                        )
-                                    }
-                                }
-                                if (selectedDay != null) {
-                                    Text("Bloque", color = colores.texto, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                    val chunks = bloques30.chunked(4)
-                                    chunks.forEach { row ->
-                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                                            row.forEach { bloque ->
-                                                FilterChip(
-                                                    selected = selectedBlock == bloque,
-                                                    onClick = { selectedBlock = if (selectedBlock == bloque) null else bloque },
-                                                    label = { Text(bloque, fontSize = 10.sp) },
-                                                    colors = FilterChipDefaults.filterChipColors(
-                                                        selectedContainerColor = ColorAzul, selectedLabelColor = Color.White
-                                                    )
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    selectedDay?.let { d ->
-                                        selectedBlock?.let { b ->
-                                            viewModel.guardarBloqueoDescanso(d, b)
-                                            showDialog = false; selectedDay = null; selectedBlock = null
-                                        }
-                                    }
-                                },
-                                enabled = selectedDay != null && selectedBlock != null
-                            ) {
-                                Text("Guardar", color = ColorAzul)
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showDialog = false; selectedDay = null; selectedBlock = null }) {
-                                Text("Cancelar", color = colores.textoSub)
-                            }
+                item {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 0.dp)
+                    ) {
+                        items(diasConFecha) { (label, fecha) ->
+                            val sel = diaSeleccionado == fecha
+                            FilterChip(
+                                selected = sel,
+                                onClick = { diaSeleccionado = fecha },
+                                label = { Text(label, fontSize = 12.sp,
+                                    fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ColorAzul,
+                                    selectedLabelColor = Color.White
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    borderColor = if (sel) ColorAzul else colores.borde,
+                                    selectedBorderColor = ColorAzul, enabled = true, selected = sel
+                                )
+                            )
                         }
-                    )
+                    }
                 }
-    
-                HorizontalDivider(color = colores.borde)
-    
-                Text("Mis citas de hoy", color = colores.texto, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-    
-                if (uiState.citasConDetalle.isEmpty()) {
-                    Text("Sin citas para hoy", color = colores.textoSub, fontSize = 14.sp)
+
+                if (cargando) {
+                    item { Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = ColorAzul, strokeWidth = 2.5.dp, modifier = Modifier.size(36.dp))
+                    } }
+                } else if (citasDelDia.isEmpty()) {
+                    item { Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Filled.CalendarMonth, null, tint = colores.textoSub, modifier = Modifier.size(48.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text("Sin citas para este día", color = colores.textoSub, fontSize = 15.sp)
+                        }
+                    } }
                 } else {
-                    uiState.citasConDetalle.forEach { detalle ->
+                    items(citasDelDia, key = { it.idCita ?: 0 }) { cita ->
+                        val colorEstado = when (cita.estado) {
+                            EstadoCitaEnum.PENDIENTE     -> ColorDorado
+                            EstadoCitaEnum.EN_CURSO      -> ColorAzul
+                            EstadoCitaEnum.FINALIZADA    -> ColorVerde
+                            EstadoCitaEnum.CANCELADA     -> ColorError
+                            EstadoCitaEnum.NO_PRESENTADO -> colores.textoSub
+                            null                         -> colores.textoSub
+                        }
+                        val nombreCliente = uiState.mapaUsuarios[cita.idUsuario]
+                            ?: "Cliente #${cita.idUsuario}"
+                        val nombreServicio = uiState.mapaServicios[cita.idServicio]
+                            ?: "Servicio #${cita.idServicio}"
+
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = colores.superficie)
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { citaDetalle = cita },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = colores.superficie),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text(detalle.cita.horaInicio?.take(5) ?: "--:--",
-                                    color = ColorAzul, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Column {
-                                    Text(detalle.clienteNombre, color = colores.texto, fontWeight = FontWeight.Medium)
-                                    Text(detalle.servicioNombre, color = colores.textoSub, fontSize = 12.sp)
+                            Column {
+                                Row {
+                                    Box(Modifier.width(4.dp).height(90.dp).background(colorEstado))
+                                    Column(Modifier.weight(1f).padding(14.dp)) {
+                                        Row(Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically) {
+                                            Text(nombreCliente, fontWeight = FontWeight.Bold,
+                                                color = colores.texto, fontSize = 14.sp)
+                                            BadgeEstado(cita.estado, colores)
+                                        }
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(nombreServicio, color = colores.textoSub, fontSize = 13.sp)
+                                        Spacer(Modifier.height(2.dp))
+                                        Text("${cita.fecha} · ${cita.horaInicio?.take(5)}",
+                                            color = colores.textoSub, fontSize = 12.sp)
+                                    }
+                                }
+                                if (cita.estado == EstadoCitaEnum.PENDIENTE ||
+                                    cita.estado == EstadoCitaEnum.EN_CURSO) {
+                                    HorizontalDivider(color = colores.borde)
+                                    Row(Modifier.padding(8.dp).fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(
+                                            onClick = { accionConfirmar = cita.idCita to "finalizar" },
+                                            modifier = Modifier.weight(1f),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = ColorVerde),
+                                            border = BorderStroke(1.dp, ColorVerde)
+                                        ) { Text("Finalizar", fontSize = 12.sp) }
+                                        OutlinedButton(
+                                            onClick = { accionConfirmar = cita.idCita to "nopresento" },
+                                            modifier = Modifier.weight(1f),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = colores.textoSub),
+                                            border = BorderStroke(1.dp, colores.textoSub)
+                                        ) { Text("No se presentó", fontSize = 12.sp) }
+                                    }
                                 }
                             }
                         }
@@ -906,110 +1008,158 @@ private fun ResenasBarberoTab(
 @Composable
 private fun HorariosBarberoTab(
     uiState: com.example.barberia.viewmodel.BarberoUiState,
+    viewModel: BarberoViewModel,
     colores: BarberiaColores
 ) {
-    val diasSemana = listOf("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO")
-    var selectedDay by remember { mutableStateOf<String?>(null) }
+    val diasCorto = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+    val diasFull = listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+    val cal = remember { java.util.Calendar.getInstance() }
+    val todayIndex = remember { (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7 }
+    val diasConFecha = remember {
+        (0..6).map { i ->
+            val c = java.util.Calendar.getInstance()
+            val hoy = c.get(java.util.Calendar.DAY_OF_WEEK)
+            c.add(java.util.Calendar.DAY_OF_MONTH, i - (hoy + 5) % 7)
+            val fecha = "%d-%02d-%02d".format(
+                c.get(java.util.Calendar.YEAR),
+                c.get(java.util.Calendar.MONTH) + 1,
+                c.get(java.util.Calendar.DAY_OF_MONTH)
+            )
+            Triple(diasCorto[i], diasFull[i], fecha)
+        }
+    }
+    var diaSeleccionado by remember { mutableStateOf<String?>(diasConFecha[todayIndex].third) }
+    var bloqueos by remember { mutableStateOf<List<BloqueoHorarioDTO>>(emptyList()) }
+    var citasDelDia by remember { mutableStateOf<List<CitaDTO>>(emptyList()) }
 
-    val citasFiltradas = remember(selectedDay, uiState.todasLasCitas, uiState.citasConDetalle) {
-        if (selectedDay == null) emptyList()
-        else {
-            val targetIndex = diasSemana.indexOf(selectedDay)
-            uiState.todasLasCitas.filter { cita ->
-                try {
-                    val parts = cita.fecha.split("-")
-                    if (parts.size < 3) false
-                    else {
-                        val cal = java.util.Calendar.getInstance()
-                        cal.set(java.util.Calendar.YEAR, parts[0].toInt())
-                        cal.set(java.util.Calendar.MONTH, parts[1].toInt() - 1)
-                        cal.set(java.util.Calendar.DAY_OF_MONTH, parts[2].toInt())
-                        val diaIndex = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
-                        diaIndex == targetIndex
-                    }
-                } catch (_: Exception) { false }
-            }
+    LaunchedEffect(Unit) {
+        try {
+            val bResp = viewModel.obtenerBloqueos()
+            if (bResp.isSuccessful) bloqueos = bResp.body() ?: emptyList()
+        } catch (_: Exception) { }
+    }
+
+    LaunchedEffect(diaSeleccionado) {
+        val fecha = diaSeleccionado ?: return@LaunchedEffect
+        try {
+            val r = viewModel.obtenerCitasPorFecha(fecha)
+            if (r.isSuccessful) citasDelDia = r.body() ?: emptyList()
+        } catch (_: Exception) { }
+    }
+
+    val bloques30 = remember {
+        (9 until 19).flatMap { h ->
+            listOf("%02d:00".format(h) to "%02d:30".format(h),
+                   "%02d:30".format(h) to "%02d:00".format(h + 1))
         }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(colores.fondo)) {
         LazyColumn(
-            modifier = Modifier.weight(1f)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.weight(1f).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(Modifier.height(12.dp))
                 Text("Horarios", color = colores.texto, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             }
 
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    items(diasSemana) { dia ->
-                        val seleccionado = selectedDay == dia
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 0.dp)
+                ) {
+                    items(diasConFecha) { (label, _, fecha) ->
+                        val sel = diaSeleccionado == fecha
                         FilterChip(
-                            selected = seleccionado,
-                            onClick = { selectedDay = if (seleccionado) null else dia },
-                            label = { Text(dia.take(3), fontSize = 12.sp) },
+                            selected = sel,
+                            onClick = { diaSeleccionado = fecha },
+                            label = { Text(label, fontSize = 12.sp,
+                                fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = ColorAzul,
                                 selectedLabelColor = Color.White
                             ),
                             border = FilterChipDefaults.filterChipBorder(
-                                borderColor = if (seleccionado) ColorAzul else colores.borde,
-                                selectedBorderColor = ColorAzul,
-                                enabled = true,
-                                selected = seleccionado
+                                borderColor = if (sel) ColorAzul else colores.borde,
+                                selectedBorderColor = ColorAzul, enabled = true, selected = sel
                             )
                         )
                     }
                 }
             }
-    
-            if (selectedDay != null) {
-                if (citasFiltradas.isEmpty()) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().height(160.dp),
-                            contentAlignment = Alignment.Center) {
-                            Text("Sin citas para este día", color = colores.textoSub, fontSize = 15.sp)
-                        }
+
+            val idx = diasConFecha.indexOfFirst { it.third == diaSeleccionado }
+            val nombreDia = if (idx >= 0) diasFull[idx] else ""
+            val fecha = diaSeleccionado ?: ""
+            val bloqueosDia = if (idx >= 0) bloqueos.filter { b ->
+                b.fechaInicio?.substringBefore("T") == fecha
+            } else emptyList()
+
+            if (citasDelDia.isEmpty() && bloqueosDia.isEmpty()) {
+                item {
+                    Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
+                        Text("Sin actividad este día", color = colores.textoSub, fontSize = 15.sp)
                     }
-                } else {
-                    items(citasFiltradas) { cita ->
-                        val detalle = uiState.citasConDetalle.find { it.cita.idCita == cita.idCita }
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = colores.superficie)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(cita.horaInicio?.take(5) ?: "--:--",
-                                        color = ColorAzul, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                    Text(cita.horaFin?.take(5) ?: "--:--",
-                                        color = colores.textoSub, fontSize = 12.sp)
+                }
+            } else {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = colores.superficie),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(nombreDia, color = ColorAzul, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Spacer(Modifier.height(8.dp))
+                            bloques30.forEach { (hInicio, hFin) ->
+                                val cita = citasDelDia.find { c ->
+                                    c.horaInicio?.take(5) == hInicio
                                 }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        detalle?.clienteNombre ?: "Cliente #${cita.idUsuario}",
-                                        color = colores.texto, fontWeight = FontWeight.Medium, fontSize = 14.sp
-                                    )
-                                    Text(
-                                        detalle?.servicioNombre ?: "Servicio #${cita.idServicio}",
-                                        color = colores.textoSub, fontSize = 12.sp
-                                    )
+                                val esDescanso = bloqueosDia.any { b ->
+                                    val bInicio = b.fechaInicio?.substringAfter("T")?.take(5)
+                                    val bFin = b.fechaFin?.substringAfter("T")?.take(5)
+                                    bInicio == hInicio && bFin == hFin
+                                }
+                                val clienteNombre = if (cita != null)
+                                    (uiState.mapaUsuarios[cita.idUsuario] ?: "Cliente #${cita.idUsuario}")
+                                else ""
+                                val servicioNombre = if (cita != null)
+                                    (uiState.mapaServicios[cita.idServicio] ?: "Servicio #${cita.idServicio}")
+                                else ""
+                                val bgBlock = when {
+                                    cita != null -> ColorAzul.copy(alpha = 0.08f)
+                                    esDescanso -> ColorDorado.copy(alpha = 0.12f)
+                                    else -> colores.fondo
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().background(bgBlock, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("$hInicio-$hFin", color = colores.textoSub, fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium)
+                                        if (cita != null) {
+                                            Text("$clienteNombre · $servicioNombre",
+                                                color = ColorAzul, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                        } else if (esDescanso) {
+                                            Text("🍽 Descanso", color = ColorDorado, fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold)
+                                        } else {
+                                            Text("Disponible", color = colores.textoSub.copy(0.5f), fontSize = 13.sp)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-    
-            item { Spacer(modifier = Modifier.height(20.dp)) }
+            item { Spacer(Modifier.height(12.dp)) }
         }
     }
 }
@@ -1019,13 +1169,31 @@ private fun HorariosBarberoTab(
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
+private fun BadgeEstado(estado: EstadoCitaEnum?, colores: BarberiaColores) {
+    val (texto, color) = when (estado) {
+        EstadoCitaEnum.PENDIENTE     -> "Pendiente" to ColorDorado
+        EstadoCitaEnum.EN_CURSO      -> "En curso"  to ColorAzul
+        EstadoCitaEnum.FINALIZADA    -> "Finalizada" to ColorVerde
+        EstadoCitaEnum.CANCELADA     -> "Cancelada" to ColorError
+        EstadoCitaEnum.NO_PRESENTADO -> "No se presentó" to colores.textoSub
+        null                         -> "" to colores.textoSub
+    }
+    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(color.copy(alpha = 0.15f))
+        .padding(horizontal = 10.dp, vertical = 4.dp)) {
+        Text(texto, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
 private fun TarjetaCitaBarbero(
     cita: CitaDTO,
     colores: BarberiaColores,
+    uiState: com.example.barberia.viewmodel.BarberoUiState,
     onClick: () -> Unit,
     onIniciar: () -> Unit,
     onFinalizar: () -> Unit,
-    onNoPresento: () -> Unit
+    onNoPresento: () -> Unit,
+    onCancelar: () -> Unit
 ) {
     val colorEstado = when (cita.estado) {
         EstadoCitaEnum.PENDIENTE     -> ColorDorado
@@ -1035,79 +1203,61 @@ private fun TarjetaCitaBarbero(
         EstadoCitaEnum.NO_PRESENTADO -> colores.textoSub
         null                         -> colores.textoSub
     }
+    val nombreCliente = uiState.mapaUsuarios[cita.idUsuario] ?: "Cliente #${cita.idUsuario}"
+    val nombreServicio = uiState.mapaServicios[cita.idServicio] ?: "Servicio #${cita.idServicio}"
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(4.dp, RoundedCornerShape(14.dp))
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
             .clickable { onClick() },
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = colores.superficie)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = colores.superficie),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
             Row {
                 Box(modifier = Modifier.width(4.dp).height(90.dp).background(colorEstado))
-                Column(modifier = Modifier.weight(1f)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(),
+                Column(modifier = Modifier.weight(1f).padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top) {
-                        Column {
-                            Text(cita.horaInicio?.take(5) ?: "--:--",
-                                color = ColorAzul, fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold)
-                            Text("hasta ${cita.horaFin?.take(5) ?: "--:--"}",
-                                color = colores.textoSub, fontSize = 12.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Cliente #${cita.idUsuario}",
-                                color = colores.texto, fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium)
-                            Text("Servicio #${cita.idServicio}",
-                                color = colores.textoSub, fontSize = 12.sp)
-                        }
-                        Box(modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                            .background(colorEstado.copy(alpha = 0.15f))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)) {
-                            Text(
-                                text = when (cita.estado) {
-                                    EstadoCitaEnum.PENDIENTE     -> "Pendiente"
-                                    EstadoCitaEnum.EN_CURSO      -> "En curso"
-                                    EstadoCitaEnum.FINALIZADA    -> "Finalizada"
-                                    EstadoCitaEnum.CANCELADA     -> "Cancelada"
-                                    EstadoCitaEnum.NO_PRESENTADO -> "No se presentó"
-                                    null -> ""
-                                },
-                                color = colorEstado, fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(nombreCliente, fontWeight = FontWeight.Bold, color = colores.texto,
+                            fontSize = 14.sp)
+                        BadgeEstado(cita.estado, colores)
                     }
+                    Spacer(Modifier.height(2.dp))
+                    Text(nombreServicio, color = colores.textoSub, fontSize = 13.sp)
+                    Spacer(Modifier.height(2.dp))
+                    Text("${cita.fecha} · ${cita.horaInicio?.take(5)}",
+                        color = colores.textoSub, fontSize = 12.sp)
                 }
             }
-
             if (cita.estado == EstadoCitaEnum.PENDIENTE ||
                 cita.estado == EstadoCitaEnum.EN_CURSO) {
                 HorizontalDivider(color = colores.borde)
-                Row(modifier = Modifier
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .fillMaxWidth(),
+                Row(modifier = Modifier.padding(8.dp).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BotonBarberoAnimado(
-                        text = "Cita terminada",
-                        icon = Icons.Filled.CheckCircle,
-                        color = ColorVerde,
-                        colores = colores,
+                    OutlinedButton(
+                        onClick = onFinalizar,
                         modifier = Modifier.weight(1f),
-                        onClick = onFinalizar
-                    )
-                    BotonBarberoAnimado(
-                        text = "No se presentó",
-                        icon = Icons.Filled.PersonOff,
-                        color = ColorError,
-                        colores = colores,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorVerde),
+                        border = BorderStroke(1.dp, ColorVerde)
+                    ) { Text("Finalizar", fontSize = 12.sp) }
+                    if (cita.estado == EstadoCitaEnum.PENDIENTE) {
+                        OutlinedButton(
+                            onClick = onCancelar,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorError),
+                            border = BorderStroke(1.dp, ColorError)
+                        ) { Text("Cancelar", fontSize = 12.sp) }
+                    }
+                    OutlinedButton(
+                        onClick = onNoPresento,
                         modifier = Modifier.weight(1f),
-                        onClick = onNoPresento
-                    )
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = colores.textoSub),
+                        border = BorderStroke(1.dp, colores.textoSub)
+                    ) { Text("No se presentó", fontSize = 12.sp) }
                 }
             }
         }

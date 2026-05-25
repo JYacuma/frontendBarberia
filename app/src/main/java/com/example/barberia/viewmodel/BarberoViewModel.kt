@@ -22,13 +22,15 @@ data class BarberoUiState(
     val promedio: Double = 0.0,
     val notificacionesCount: Int = 0,
     val todosBloqueos: List<BloqueoHorarioDTO> = emptyList(),
+    val mapaUsuarios: Map<Long, String> = emptyMap(),
+    val mapaServicios: Map<Long, String> = emptyMap(),
     val errorMessage: String? = null,
     val successMessage: String? = null
 )
 
 class BarberoViewModel(
     private val apiService: ApiService,
-    private val idBarbero: Long,
+    private var idBarbero: Long,
     private val idUsuario: Long
 ) : ViewModel() {
 
@@ -48,6 +50,8 @@ class BarberoViewModel(
         }
 
 
+    fun actualizarIdBarbero(id: Long) { idBarbero = id }
+
     fun cargarDatosIniciales() {
         viewModelScope.launch {
             if (idBarbero == 0L) {
@@ -63,13 +67,18 @@ class BarberoViewModel(
                 val bloqueosDeferred = async { apiService.getBloqueosByBarbero(idBarbero) }
                 val horariosDeferred = async { apiService.getHorariosByBarbero(idBarbero) }
                 val resenasDeferred  = async { apiService.getResenasByBarbero(idBarbero) }
+                val todasCitasDeferred = async { apiService.getCitas() }
 
                 val citasHoy  = citasHoyDeferred.await()
                 val bloqueos  = bloqueosDeferred.await()
                 val horarios  = horariosDeferred.await()
                 val resenasResp = resenasDeferred.await()
+                val todasCitasResp = todasCitasDeferred.await()
 
                 val citas = if (citasHoy.isSuccessful) citasHoy.body() ?: emptyList() else emptyList()
+                val todasCitas = if (todasCitasResp.isSuccessful)
+                    (todasCitasResp.body() ?: emptyList()).filter { it.idBarbero == idBarbero }
+                else emptyList()
                 val resenasList = if (resenasResp.isSuccessful) resenasResp.body() ?: emptyList() else emptyList()
                 val bloqueosList = if (bloqueos.isSuccessful) bloqueos.body() ?: emptyList() else emptyList()
                 val horariosList = if (horarios.isSuccessful) horarios.body() ?: emptyList() else emptyList()
@@ -103,6 +112,23 @@ class BarberoViewModel(
                     r to (usuariosMap[r.idUsuario] ?: "Cliente #${r.idUsuario}")
                 }
 
+                val idsUsuarios = todasCitas.map { it.idUsuario }.distinct()
+                val mapaUsuarios = mutableMapOf<Long, String>()
+                for (uid in idsUsuarios) {
+                    try {
+                        val u = apiService.getUsuarioById(uid)
+                        if (u.isSuccessful) {
+                            u.body()?.let { mapaUsuarios[uid] = it.nombre }
+                        }
+                    } catch (_: Exception) { }
+                }
+
+                val serviciosResp = apiService.getServicios()
+                val mapaServicios = if (serviciosResp.isSuccessful)
+                    (serviciosResp.body() ?: emptyList())
+                        .associate { it.idServicio!! to it.nombre }
+                else emptyMap()
+
                 var notificacionesReales = 0
                 for (cita in citas.take(30)) {
                     cita.idCita?.let { id ->
@@ -116,13 +142,16 @@ class BarberoViewModel(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     citasHoy = citas,
+                    todasLasCitas = todasCitas,
                     bloqueos = bloqueosList,
                     horarios = horariosList,
                     resenas = resenasList,
                     resenasConCliente = resConCliente,
                     promedio = prom,
                     notificacionesCount = notificacionesReales,
-                    todosBloqueos = todosBloqueosList.toList()
+                    todosBloqueos = todosBloqueosList.toList(),
+                    mapaUsuarios = mapaUsuarios.toMap(),
+                    mapaServicios = mapaServicios
                 )
 
                 cargarCitasConDetalle()
@@ -138,14 +167,14 @@ class BarberoViewModel(
     fun cargarCitasConDetalle() {
         viewModelScope.launch {
             try {
-                val citas = _uiState.value.citasHoy
-                if (citas.isEmpty()) return@launch
+                val todas = _uiState.value.todasLasCitas
+                if (todas.isEmpty()) return@launch
 
                 val barberoResp = apiService.getBarberoById(idBarbero)
                 val barberoNombre = if (barberoResp.isSuccessful)
                     barberoResp.body()?.nombre ?: "Barbero" else "Barbero"
 
-                val serviciosIds = citas.map { it.idServicio }.distinct()
+                val serviciosIds = todas.map { it.idServicio }.distinct()
                 val serviciosMap = mutableMapOf<Long, String>()
                 for (sid in serviciosIds) {
                     val sResp = apiService.getServicioById(sid)
@@ -154,7 +183,7 @@ class BarberoViewModel(
                     }
                 }
 
-                val usuariosIds = citas.map { it.idUsuario }.distinct()
+                val usuariosIds = todas.map { it.idUsuario }.distinct()
                 val usuariosMap = mutableMapOf<Long, String>()
                 for (uid in usuariosIds) {
                     val uResp = apiService.getUsuarioById(uid)
@@ -163,7 +192,7 @@ class BarberoViewModel(
                     }
                 }
 
-                val detalle = citas.map { cita ->
+                val detalle = todas.map { cita ->
                     CitaConDetalle(
                         cita = cita,
                         clienteNombre = usuariosMap[cita.idUsuario] ?: "Cliente #${cita.idUsuario}",
@@ -332,6 +361,14 @@ class BarberoViewModel(
             errorMessage   = null,
             successMessage = null
         )
+    }
+
+    suspend fun obtenerCitasPorFecha(fecha: String): retrofit2.Response<List<CitaDTO>> {
+        return apiService.getCitasByBarberoYFecha(idBarbero, fecha)
+    }
+
+    suspend fun obtenerBloqueos(): retrofit2.Response<List<BloqueoHorarioDTO>> {
+        return apiService.getBloqueosByBarbero(idBarbero)
     }
 
     fun guardarBloqueoDescanso(dia: String, bloque: String) {

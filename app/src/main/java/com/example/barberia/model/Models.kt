@@ -156,7 +156,8 @@ data class NotificacionDTO(
     val idCita: Long,
     val tipo: TipoNotificacionEnum,
     val mensaje: String? = null,
-    val enviado: Boolean? = false
+    val enviado: Boolean? = false,
+    val fechaEnvio: String? = null
 )
 
 // ── DETALLE COMPUESTO ──────────────────────────────────────────────────────

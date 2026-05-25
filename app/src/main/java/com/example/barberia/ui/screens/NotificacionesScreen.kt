@@ -114,7 +114,7 @@ fun NotificacionesScreen(
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    if (esAgendada) "Cita agendada" else "Cita cancelada",
+                                    if (esAgendada) "Tu cita fue agendada" else "Tu cita fue cancelada",
                                     color = colores.texto,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 14.sp

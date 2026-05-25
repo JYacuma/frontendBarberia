@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -81,7 +82,7 @@ fun InfoBarberoScreen(
         else resenas.map { it.calificacion }.average()
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(colores.fondo)) {
+    Column(modifier = Modifier.fillMaxSize().background(colores.fondo).statusBarsPadding()) {
         Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
             androidx.compose.ui.graphics.Brush.horizontalGradient(
                 listOf(ColorRojo, ColorRojo.copy(0.5f), ColorRojo)

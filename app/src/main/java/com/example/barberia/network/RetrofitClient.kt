@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import com.google.gson.GsonBuilder
 import retrofit2.Retrofit
@@ -36,13 +37,28 @@ object RetrofitClient {
         chain.proceed(request)
     }
 
-    // Interceptor de logs — muestra en Logcat cada request y response
-    // Muy útil para depurar qué se envía y qué responde el backend
+    // Interceptor que fuerza UTF-8 en todas las respuestas
+    private val charsetInterceptor = Interceptor { chain ->
+        val response = chain.proceed(chain.request())
+        val body = response.body
+        if (body != null) {
+            val source = body.source()
+            source.request(Long.MAX_VALUE)
+            val charset = body.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
+            val bodyString = source.buffer.clone().readString(charset)
+            response.newBuilder()
+                .body(bodyString.toResponseBody(body.contentType()))
+                .build()
+        } else response
+    }
+
+    // Interceptor de logs — muestra en Logcat headers de request/response sin alterar el body
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.HEADERS
+        level = HttpLoggingInterceptor.Level.BASIC
     }
 
     private val okHttpClient = OkHttpClient.Builder()
+        .addInterceptor(charsetInterceptor)
         .addInterceptor(authInterceptor)
         .addInterceptor(loggingInterceptor)
         // 90 segundos porque Render en plan gratuito tarda 30-60s en despertar

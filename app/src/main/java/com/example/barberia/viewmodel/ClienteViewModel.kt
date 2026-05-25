@@ -6,12 +6,15 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.barberia.model.*
 import com.example.barberia.network.ApiService
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 object ClienteBarberoPreseleccion {
-    var idBarbero: Long = 0L
+    var idBarbero: Long by mutableStateOf(0L)
 }
 
 data class ClienteUiState(
@@ -257,6 +260,7 @@ class ClienteViewModel(
                 )
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(successMessage = "¡Reseña enviada!")
+                    cargarDatosIniciales()
                 } else {
                     _uiState.value = _uiState.value.copy(
                         errorMessage = "Error al enviar reseña (${response.code()})")

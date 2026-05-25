@@ -104,7 +104,7 @@ fun ClienteScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(ClienteBarberoPreseleccion.idBarbero) {
         val id = ClienteBarberoPreseleccion.idBarbero
         if (id != 0L) {
             ClienteBarberoPreseleccion.idBarbero = 0L
@@ -129,33 +129,36 @@ fun ClienteScreen(
         gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(drawerContainerColor = colores.superficie) {
-                Box(modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(modifier = Modifier.fillMaxWidth().background(
+                    Brush.horizontalGradient(listOf(ColorRojo.copy(0.15f), ColorRojo.copy(0.05f)))
+                ), contentAlignment = Alignment.Center) {
+                    Column(modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(modifier = Modifier.size(64.dp).clip(CircleShape)
-                            .background(ColorRojo),
+                            .background(ColorRojo.copy(0.2f)),
                             contentAlignment = Alignment.Center) {
-                            Text(initials, color = Color.White,
+                            Text(initials, color = ColorRojo,
                                 fontWeight = FontWeight.Bold, fontSize = 24.sp)
                         }
                         Spacer(Modifier.height(8.dp))
-                        Text(nombre, fontWeight = FontWeight.Bold, color = colores.texto, fontSize = 16.sp)
+                        Text(nombre, fontWeight = FontWeight.Bold,
+                            color = colores.texto, fontSize = 16.sp)
                     }
                 }
-                HorizontalDivider()
+                HorizontalDivider(color = colores.borde)
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Filled.Person, null, tint = ColorRojo) },
-                    label = { Text("Perfil") },
+                    icon = { Icon(Icons.Filled.Person, null, tint = colores.texto) },
+                    label = { Text("Perfil", color = colores.texto) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToPerfil() }
                 )
                 NavigationDrawerItem(
                     icon = { Icon(Icons.AutoMirrored.Filled.Logout, null, tint = ColorError) },
-                    label = { Text("Cerrar sesión") },
+                    label = { Text("Cerrar sesión", color = colores.texto) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onLogout() }
                 )
-                HorizontalDivider()
+                HorizontalDivider(color = colores.borde)
                 Text("Tema:", modifier = Modifier.padding(16.dp, 8.dp),
                     color = colores.textoSub, fontSize = 12.sp)
                 listOf("Claro" to false, "Sistema" to null, "Oscuro" to true).forEach { (label, mode) ->
@@ -172,65 +175,71 @@ fun ClienteScreen(
                                 else colores.textoSub
                             )
                         },
-                        label = { Text(label) },
+                        label = { Text(label, color = colores.texto) },
                         selected = TemaManager.modoOscuro.value == mode,
                         onClick = {
                             TemaManager.modoOscuro.value = mode
                             scope.launch { drawerState.close() }
         }
     )
-        }   // close forEach
-        }   // close ModalDrawerSheet
-    }   // close drawerContent
+        }
+        }
+    }
     ) {
-        Scaffold(
-            containerColor = colores.fondo,
-            bottomBar = {
-                NavigationBar(
-                    containerColor = colores.superficie,
-                    tonalElevation = 0.dp,
-                    modifier = if (!colores.esModoOscuro) Modifier.shadow(4.dp)
-                    else Modifier.border(1.dp, colores.borde, RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp))
-                ) {
-                    val pages = listOf(
-                        Triple("Inicio",    Icons.Filled.Home,          0),
-                        Triple("Agendar",   Icons.Filled.CalendarMonth, 1),
-                        Triple("Mis Citas", Icons.Filled.ListAlt,       2)
-                    )
-                    pages.forEach { (label, icon, index) ->
-                        val activo = pagerState.currentPage == index
-                        NavigationBarItem(
-                            selected = activo,
-                            onClick  = { scope.launch { pagerState.animateScrollToPage(index) } },
-                            icon = {
-                                Icon(icon, label,
-                                    tint = if (activo) ColorRojo else colores.textoSub,
-                                    modifier = Modifier.size(22.dp))
-                            },
-                            label = {
-                                Text(label, color = if (activo) ColorRojo else colores.textoSub,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (activo) FontWeight.SemiBold else FontWeight.Normal)
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = ColorRojo.copy(alpha = 0.15f))
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+                Brush.horizontalGradient(
+                    listOf(ColorRojo, ColorRojo.copy(0.5f), ColorRojo)
+                ))) {}
+            Scaffold(
+                containerColor = colores.fondo,
+                bottomBar = {
+                    NavigationBar(
+                        containerColor = colores.superficie,
+                        tonalElevation = 0.dp,
+                        modifier = if (!colores.esModoOscuro) Modifier.shadow(4.dp)
+                        else Modifier.border(1.dp, colores.borde, RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp))
+                    ) {
+                        val pages = listOf(
+                            Triple("Inicio",    Icons.Filled.Home,          0),
+                            Triple("Agendar",   Icons.Filled.CalendarMonth, 1),
+                            Triple("Mis Citas", Icons.Filled.ListAlt,       2)
                         )
+                        pages.forEach { (label, icon, index) ->
+                            val activo = pagerState.currentPage == index
+                            NavigationBarItem(
+                                selected = activo,
+                                onClick  = { scope.launch { pagerState.animateScrollToPage(index) } },
+                                icon = {
+                                    Icon(icon, label,
+                                        tint = if (activo) ColorRojo else colores.textoSub,
+                                        modifier = Modifier.size(22.dp))
+                                },
+                                label = {
+                                    Text(label, color = if (activo) ColorRojo else colores.textoSub,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (activo) FontWeight.SemiBold else FontWeight.Normal)
+                                },
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = ColorRojo.copy(alpha = 0.15f))
+                            )
+                        }
                     }
                 }
-            }
-        ) { padding ->
-            HorizontalPager(
-                state             = pagerState,
-                modifier          = Modifier.fillMaxSize().padding(padding),
-                userScrollEnabled = true
-            ) { pagina ->
-                when (pagina) {
-                     0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones,
-                         onNavigateToPerfil = onNavigateToPerfil,
-                         onOpenDrawer = { scope.launch { drawerState.open() } },
-                         onNavigateToInfoBarbero = onNavigateToInfoBarbero)
-                    1 -> AgendarTab(uiState, viewModel, colores)
-                     2 -> MisCitasTab(uiState, viewModel, colores)
+            ) { padding ->
+                HorizontalPager(
+                    state             = pagerState,
+                    modifier          = Modifier.fillMaxSize().padding(padding),
+                    userScrollEnabled = true
+                ) { pagina ->
+                    when (pagina) {
+                         0 -> InicioTab(nombre, uiState, viewModel, colores, pagerState, scope, onLogout, onNavigateToNotificaciones,
+                             onNavigateToPerfil = onNavigateToPerfil,
+                             onOpenDrawer = { scope.launch { drawerState.open() } },
+                             onNavigateToInfoBarbero = onNavigateToInfoBarbero)
+                        1 -> AgendarTab(uiState, viewModel, colores)
+                         2 -> MisCitasTab(uiState, viewModel, colores)
+                    }
                 }
             }
         }
@@ -260,12 +269,8 @@ private fun InicioTab(
         ascii.split(" ").take(2).joinToString("") { it.first().uppercase() }
     }
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-            Brush.horizontalGradient(
-                listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
-            ))) {}
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(modifier = Modifier.size(44.dp).clip(CircleShape)
@@ -762,10 +767,6 @@ private fun AgendarTab(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-            Brush.horizontalGradient(
-                listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
-            ))) {}
         PullToRefreshBox(
             isRefreshing = uiState.isLoading,
             onRefresh = { viewModel.cargarDatosIniciales() },
@@ -777,7 +778,7 @@ private fun AgendarTab(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    Spacer(modifier = Modifier.height(40.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                 Text("Agendar Cita", color = colores.texto,
                     fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text("Sigue los pasos para reservar", color = colores.textoSub, fontSize = 13.sp)
@@ -1242,40 +1243,40 @@ private fun MisCitasTab(
                 }
             },
             confirmButton = if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE) {
-                {
+                @Composable {
                     BarberiaBoton("Cancelar cita", onClick = {
                         citaDetalle = null
                         citaParaCancelar = detalle
                     })
                 }
+            } else if (detalle.cita.estado == EstadoCitaEnum.FINALIZADA) {
+                @Composable {
+                    BarberiaBoton("Dejar reseña", onClick = {
+                        citaDetalle = null
+                        citaParaResena = detalle.cita
+                    })
+                }
             } else {
-                {
+                @Composable {
                     TextButton(onClick = { citaDetalle = null }) {
                         Text("Cerrar", color = colores.textoSub)
                     }
                 }
             },
-            dismissButton = if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE) {
-                {
+            dismissButton = if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE ||
+                detalle.cita.estado == EstadoCitaEnum.FINALIZADA) {
+                @Composable {
                     TextButton(onClick = { citaDetalle = null }) {
                         Text("Cerrar", color = colores.textoSub)
                     }
                 }
             } else {
-                {
-                    TextButton(onClick = { citaDetalle = null }) {
-                        Text("Cerrar", color = colores.textoSub)
-                    }
-                }
+                null
             }
         )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-            Brush.horizontalGradient(
-                listOf(ColorRojo, ColorBlanco, ColorRojo, ColorBlanco, ColorRojo)
-            ))) {}
         PullToRefreshBox(
             isRefreshing = uiState.isLoading,
             onRefresh = { viewModel.cargarDatosIniciales() },
@@ -1287,7 +1288,7 @@ private fun MisCitasTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    Spacer(modifier = Modifier.height(40.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                 Text("Mis Citas", color = colores.texto,
                     fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))

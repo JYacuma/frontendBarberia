@@ -117,7 +117,8 @@ data class ResenaRequest(
     val idUsuario: Long,
     val idBarbero: Long,
     val calificacion: Int,
-    val comentario: String? = null
+    val comentario: String? = null,
+    val fecha: String? = null
 )
 
 data class ResenaDTO(
@@ -126,7 +127,8 @@ data class ResenaDTO(
     val idUsuario: Long,
     val idBarbero: Long,
     val calificacion: Int,
-    val comentario: String? = null
+    val comentario: String? = null,
+    val fecha: String? = null
 )
 
 // ── PROMEDIO ───────────────────────────────────────────────────────────────

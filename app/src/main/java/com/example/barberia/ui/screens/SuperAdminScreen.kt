@@ -94,29 +94,33 @@ fun SuperAdminScreen(
         gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(drawerContainerColor = colores.superficie) {
-                Box(modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(modifier = Modifier.fillMaxWidth().background(
+                    Brush.horizontalGradient(listOf(SuperAccent.copy(0.15f), SuperAccent.copy(0.05f)))
+                ), contentAlignment = Alignment.Center) {
+                    Column(modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(modifier = Modifier.size(64.dp).clip(CircleShape)
-                            .background(SuperAccent),
+                            .background(SuperAccent.copy(0.2f))
+                            .border(2.dp, SuperAccent, CircleShape)
+                            .clickable { scope.launch { drawerState.close() } },
                             contentAlignment = Alignment.Center) {
-                            Text(initials, color = Color.White,
+                            Text(initials, color = SuperAccent,
                                 fontWeight = FontWeight.Bold, fontSize = 24.sp)
                         }
                         Spacer(Modifier.height(8.dp))
                         Text(nombre, fontWeight = FontWeight.Bold, color = colores.texto, fontSize = 16.sp)
                     }
                 }
-                HorizontalDivider()
+                HorizontalDivider(color = colores.borde)
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Filled.Person, null, tint = SuperAccent) },
-                    label = { Text("Perfil") },
+                    icon = { Icon(Icons.Filled.Person, null, tint = colores.texto) },
+                    label = { Text("Perfil", color = colores.texto) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToPerfil(idUsuario) }
                 )
                 NavigationDrawerItem(
                     icon = { Icon(Icons.AutoMirrored.Filled.Logout, null, tint = ColorError) },
-                    label = { Text("Cerrar sesión") },
+                    label = { Text("Cerrar sesión", color = colores.texto) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onLogout() }
                 )
@@ -137,7 +141,7 @@ fun SuperAdminScreen(
                                 else colores.textoSub
                             )
                         },
-                        label = { Text(label) },
+                        label = { Text(label, color = colores.texto) },
                         selected = TemaManager.modoOscuro.value == mode,
                         onClick = {
                             TemaManager.modoOscuro.value = mode
@@ -148,7 +152,12 @@ fun SuperAdminScreen(
             }
         }
     ) {
-        Scaffold(
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+                Brush.horizontalGradient(
+                    listOf(SuperAccent, SuperAccent.copy(0.5f), SuperAccent)
+                ))) {}
+            Scaffold(
                 containerColor = colores.fondo,
                 snackbarHost = {
                     SnackbarHost(snackbarState) { data ->
@@ -182,6 +191,7 @@ fun SuperAdminScreen(
                         4 -> SuperCitasTab(uiState, viewModel, colores)
                     }
                 }
+            }
         }
     }
 }
@@ -243,10 +253,6 @@ fun SuperInicioTab(
 ) {
     LazyColumn {
         item {
-            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                        Brush.horizontalGradient(
-                            listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
-                        ))) {}
                     Column(modifier = Modifier.padding(
                         start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(),
@@ -397,10 +403,6 @@ fun SuperUsuariosTab(
     else uiState.usuarios.filter { it.rol == filtroRol }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-            Brush.horizontalGradient(
-                listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
-            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
@@ -711,10 +713,6 @@ fun SuperBarberosTab(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-            Brush.horizontalGradient(
-                listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
-            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
@@ -993,10 +991,6 @@ fun SuperServiciosTab(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-            Brush.horizontalGradient(
-                listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
-            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
@@ -1274,10 +1268,6 @@ fun SuperCitasTab(
     else uiState.citasConDetalles.filter { it.cita.estado == filtroEstado }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-            Brush.horizontalGradient(
-                listOf(SuperAccent, ColorBlanco, SuperAccent, ColorBlanco, SuperAccent)
-            ))) {}
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {

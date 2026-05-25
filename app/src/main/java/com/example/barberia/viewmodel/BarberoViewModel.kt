@@ -47,9 +47,6 @@ class BarberoViewModel(
             )
         }
 
-    init {
-        cargarDatosIniciales()
-    }
 
     fun cargarDatosIniciales() {
         viewModelScope.launch {

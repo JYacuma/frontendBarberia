@@ -62,7 +62,7 @@ fun HistorialResenasScreen(
                                         ResenaConDetalle(
                                             resena = r,
                                             barberoNombre = barbero.nombre,
-                                            fecha = ""
+                                            fecha = r.fecha ?: ""
                                         )
                                     )
                                 }

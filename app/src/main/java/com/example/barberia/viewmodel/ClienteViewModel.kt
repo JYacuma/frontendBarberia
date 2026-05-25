@@ -13,6 +13,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 object ClienteBarberoPreseleccion {
     var barbero: BarberoDTO? by mutableStateOf(null)
@@ -259,13 +261,15 @@ class ClienteViewModel(
         if (idUsuario == 0L) return
         viewModelScope.launch {
             try {
+                val ahora = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(Date())
                 val response = apiService.createResena(
                     ResenaRequest(
                         idCita       = idCita,
                         idUsuario    = idUsuario,
                         idBarbero    = idBarbero,
                         calificacion = calificacion,
-                        comentario   = comentario.ifBlank { null }
+                        comentario   = comentario.ifBlank { null },
+                        fecha        = ahora
                     )
                 )
                 if (response.isSuccessful) {

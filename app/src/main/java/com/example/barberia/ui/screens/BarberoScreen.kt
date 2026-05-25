@@ -99,29 +99,33 @@ fun BarberoScreen(
         gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(drawerContainerColor = colores.superficie) {
-                Box(modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(modifier = Modifier.fillMaxWidth().background(
+                    Brush.horizontalGradient(listOf(ColorAzul.copy(0.15f), ColorAzul.copy(0.05f)))
+                ), contentAlignment = Alignment.Center) {
+                    Column(modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(modifier = Modifier.size(64.dp).clip(CircleShape)
-                            .background(ColorAzul),
+                            .background(ColorAzul.copy(0.2f))
+                            .border(2.dp, ColorAzul, CircleShape)
+                            .clickable { scope.launch { drawerState.close() } },
                             contentAlignment = Alignment.Center) {
-                            Text(initials, color = Color.White,
+                            Text(initials, color = ColorAzul,
                                 fontWeight = FontWeight.Bold, fontSize = 24.sp)
                         }
                         Spacer(Modifier.height(8.dp))
                         Text(nombre, fontWeight = FontWeight.Bold, color = colores.texto, fontSize = 16.sp)
                     }
                 }
-                HorizontalDivider()
+                HorizontalDivider(color = colores.borde)
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Filled.Person, null, tint = ColorAzul) },
-                    label = { Text("Perfil") },
+                    icon = { Icon(Icons.Filled.Person, null, tint = colores.texto) },
+                    label = { Text("Perfil", color = colores.texto) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToPerfil() }
                 )
                 NavigationDrawerItem(
                     icon = { Icon(Icons.AutoMirrored.Filled.Logout, null, tint = ColorError) },
-                    label = { Text("Cerrar sesión") },
+                    label = { Text("Cerrar sesión", color = colores.texto) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onLogout() }
                 )
@@ -142,7 +146,7 @@ fun BarberoScreen(
                                 else colores.textoSub
                             )
                         },
-                        label = { Text(label) },
+                        label = { Text(label, color = colores.texto) },
                         selected = TemaManager.modoOscuro.value == mode,
                         onClick = {
                             TemaManager.modoOscuro.value = mode
@@ -153,7 +157,12 @@ fun BarberoScreen(
             }
         }
     ) {
-        Scaffold(
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
+                Brush.horizontalGradient(
+                    listOf(ColorAzul, ColorAzul.copy(0.5f), ColorAzul)
+                ))) {}
+            Scaffold(
             containerColor = colores.fondo,
             snackbarHost = {
                 SnackbarHost(snackbarState) { data ->
@@ -187,6 +196,7 @@ fun BarberoScreen(
                         3 -> HorariosBarberoTab(uiState, colores)
                     }
                 }
+            }
             }
         }
     }
@@ -362,10 +372,6 @@ private fun HoyTab(
             modifier = Modifier.fillMaxSize().background(colores.fondo)
         ) {
             item {
-                Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-                    Brush.horizontalGradient(
-                        listOf(ColorAzul, ColorBlanco, ColorAzul, ColorBlanco, ColorAzul)
-                    ))) {}
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -678,10 +684,6 @@ private fun AgendaTab(
     }
 
     Column(modifier = Modifier.fillMaxSize().background(colores.fondo)) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-            Brush.horizontalGradient(
-                listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
-            ))) {}
         PullToRefreshBox(
             isRefreshing = uiState.isLoading,
             onRefresh = { viewModel.cargarDatosIniciales() },
@@ -813,10 +815,6 @@ private fun ResenasBarberoTab(
     }
 
     Column(modifier = Modifier.fillMaxSize().background(colores.fondo)) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-            Brush.horizontalGradient(
-                listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
-            ))) {}
         LazyColumn(
             modifier = Modifier.weight(1f)
                 .padding(horizontal = 20.dp),
@@ -935,10 +933,6 @@ private fun HorariosBarberoTab(
     }
 
     Column(modifier = Modifier.fillMaxSize().background(colores.fondo)) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(
-            Brush.horizontalGradient(
-                listOf(ColorAzul, ColorBlanco, ColorRojo, ColorBlanco, ColorAzul)
-            ))) {}
         LazyColumn(
             modifier = Modifier.weight(1f)
                 .padding(horizontal = 20.dp),

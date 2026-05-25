@@ -2,6 +2,7 @@ package com.example.barberia.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1266,6 +1267,9 @@ fun SuperCitasTab(
 
     val citasFiltradas = if (filtroEstado == null) uiState.citasConDetalles
     else uiState.citasConDetalles.filter { it.cita.estado == filtroEstado }
+    val citasAgrupadas = citasFiltradas
+        .sortedByDescending { it.cita.fecha }
+        .groupBy { it.cita.fecha }
 
     Column(modifier = Modifier.fillMaxSize()) {
         PullToRefreshBox(
@@ -1354,17 +1358,27 @@ fun SuperCitasTab(
                     }
                 }
             } else {
-                items(citasFiltradas) { detalle ->
-                    TarjetaCitaSuper(
-                        detalle  = detalle,
-                        colores  = colores,
-                        onClick  = { citaDetalle = detalle },
-                        onCancelar = {
-                            if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE ||
-                                detalle.cita.estado == EstadoCitaEnum.EN_CURSO)
-                                citaACancelar = detalle
+                citasAgrupadas.forEach { (fecha, citas) ->
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            HorizontalDivider(modifier = Modifier.weight(1f))
+                            Text(" $fecha ", color = SuperAccent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            HorizontalDivider(modifier = Modifier.weight(1f))
                         }
-                    )
+                    }
+                    items(citas) { detalle ->
+                        TarjetaCitaSuper(
+                            detalle  = detalle,
+                            colores  = colores,
+                            onClick  = { citaDetalle = detalle },
+                            onCancelar = {
+                                if (detalle.cita.estado == EstadoCitaEnum.PENDIENTE ||
+                                    detalle.cita.estado == EstadoCitaEnum.EN_CURSO)
+                                    citaACancelar = detalle
+                            }
+                        )
+                    }
                 }
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }
@@ -1441,15 +1455,18 @@ fun SuperStatCard(
     onClick: (() -> Unit)? = null
 ) {
     Card(modifier = modifier
+        .aspectRatio(1f)
         .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = colores.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
-        Column(modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(numero, color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text(label, color = colores.textoSub, fontSize = 11.sp,
+        Column(modifier = Modifier.fillMaxSize().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center) {
+            Text(numero, color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center)
+            Text(label, color = colores.textoSub, fontSize = 11.sp,
+                textAlign = TextAlign.Center, maxLines = 2)
         }
     }
 }
@@ -1519,11 +1536,11 @@ fun TarjetaUsuarioSuper(
         elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Box(modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(colorRol)
-                .padding(horizontal = 8.dp, vertical = 2.dp)) {
-                Text(textoRol, color = Color.White,
-                    fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                .clip(RoundedCornerShape(8.dp))
+                .background(colorRol.copy(alpha = 0.15f))
+                .padding(horizontal = 8.dp, vertical = 3.dp)) {
+                Text(textoRol, color = colorRol,
+                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
             Spacer(modifier = Modifier.height(10.dp))
             Text(usuario.nombre ?: "Sin nombre", color = colores.texto,
@@ -1537,21 +1554,25 @@ fun TarjetaUsuarioSuper(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
+                    OutlinedButton(
                         onClick = onEditar,
                         modifier = Modifier.height(32.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = SuperAccent),
-                        shape = RoundedCornerShape(8.dp)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = SuperAccent),
+                        border = BorderStroke(1.dp, SuperAccent.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp)
                     ) {
                         Icon(Icons.Filled.Edit, null, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("Editar", fontSize = 11.sp)
                     }
-                    Button(
+                    OutlinedButton(
                         onClick = onEliminar,
                         modifier = Modifier.height(32.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ColorError),
-                        shape = RoundedCornerShape(8.dp)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorError),
+                        border = BorderStroke(1.dp, ColorError.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp)
                     ) {
                         Icon(Icons.Filled.DeleteOutline, null, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))

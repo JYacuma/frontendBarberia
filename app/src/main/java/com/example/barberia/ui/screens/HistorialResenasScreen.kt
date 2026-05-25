@@ -1,5 +1,6 @@
 package com.example.barberia.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -55,6 +56,8 @@ fun HistorialResenasScreen(
                 barbero.idBarbero?.let { idB ->
                     try {
                         val resResp = apiService.getResenasByBarbero(idB)
+                        Log.d("RESENAS", "Total reseñas barbero $idB: ${resResp.body()?.size}")
+                        resResp.body()?.forEach { Log.d("RESENAS", "idUsuario=${it.idUsuario}, idCita=${it.idCita}") }
                         if (resResp.isSuccessful) {
                             for (r in (resResp.body() ?: emptyList())) {
                                 if (r.idUsuario == idUsuario) {

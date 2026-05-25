@@ -141,9 +141,14 @@ class SuperAdminViewModel(
                     )
                     cargarDatosIniciales()
                 } else {
+                    val errorBody = response.errorBody()?.string() ?: ""
                     _uiState.value = _uiState.value.copy(
                         isLoading    = false,
-                        errorMessage = "Error al crear usuario (${response.code()})"
+                        errorMessage = when (response.code()) {
+                            409 -> "El correo o teléfono ya está registrado. Verifica los datos."
+                            400 -> "Datos inválidos. Revisa que el correo tenga formato correcto."
+                            else -> "Error al crear usuario (${response.code()}): $errorBody"
+                        }
                     )
                 }
             } catch (e: Exception) {

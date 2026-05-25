@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -48,7 +49,7 @@ import kotlinx.coroutines.launch
 private val AdminAccent     = ColorAzul
 private val AdminAccentSoft = ColorAzul.copy(alpha = 0.15f)
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AdminScreen(
     apiService: ApiService,
@@ -179,25 +180,25 @@ fun AdminScreen(
                     modifier          = Modifier.padding(padding).fillMaxSize(),
                     userScrollEnabled = true
                 ) { pagina ->
-                when (pagina) {
-                     0 -> AdminInicioTab(nombre, uiState, viewModel,
-                         onLogout, colores,
-                         onOpenDrawer = { scope.launch { drawerState.open() } },
-                         onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
-                         onNavigateToNotificaciones = onNavigateToNotificaciones)
-                    1 -> AdminCitasTab(uiState, viewModel, colores)
-                    2 -> AdminUsuariosTab(uiState, viewModel, colores)
-                    3 -> AdminServiciosTab(uiState, viewModel, colores)
-                    4 -> AdminHorariosTab(uiState, viewModel, colores)
-                    5 -> AdminResenasTab(uiState, viewModel, colores)
+                    when (pagina) {
+                         0 -> AdminInicioTab(nombre, uiState, viewModel,
+                              onLogout, colores,
+                              onOpenDrawer = { scope.launch { drawerState.open() } },
+                              onNavigateToTab = { scope.launch { pagerState.animateScrollToPage(it) } },
+                              onNavigateToNotificaciones = onNavigateToNotificaciones)
+                         1 -> AdminCitasTab(uiState, viewModel, colores)
+                         2 -> AdminUsuariosTab(uiState, viewModel, colores)
+                         3 -> AdminServiciosTab(uiState, viewModel, colores)
+                         4 -> AdminHorariosTab(uiState, viewModel, colores)
+                         5 -> AdminResenasTab(uiState, viewModel, colores)
                     }
                 }
             }
         }
+
     }
 }
 
-// ── Bottom Bar ──────────────────────────────────────────────────────────────
 @Composable
 private fun AdminBottomBar(
     paginaActual: Int,
@@ -548,7 +549,7 @@ private fun AdminCitasTab(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DetalleItem("Fecha", detalle.cita.fecha ?: "", Icons.Filled.CalendarMonth, colores)
-                    DetalleItem("Inicio", detalle.cita.horaInicio?.take(5) ?: "", Icons.Filled.Schedule, colores)
+                    DetalleItem("Inicio", detalle.cita.horaInicio.take(5), Icons.Filled.Schedule, colores)
                     DetalleItem("Fin", detalle.cita.horaFin?.take(5) ?: "", Icons.Filled.Schedule, colores)
                     DetalleItem("Cliente", detalle.clienteNombre, Icons.Filled.Person, colores)
                     DetalleItem("Barbero", detalle.barberoNombre, Icons.Filled.ContentCut, colores)
@@ -1073,7 +1074,8 @@ private fun AdminUsuariosTab(
 private fun AdminServiciosTab(
     uiState: com.example.barberia.viewmodel.AdminUiState,
     viewModel: AdminViewModel,
-    colores: BarberiaColores
+    colores: BarberiaColores,
+    apiService: ApiService? = null
 ) {
     var mostrarFormulario  by remember { mutableStateOf(false) }
     var nombreServicio     by remember { mutableStateOf("") }
@@ -1089,6 +1091,8 @@ private fun AdminServiciosTab(
     var editDuracion       by remember { mutableStateOf("") }
     var filtroServicio     by remember { mutableStateOf(0) }
     var isRefreshing       by remember { mutableStateOf(false) }
+    var mostrarHistorial   by remember { mutableStateOf(false) }
+    var historialCitaSel   by remember { mutableStateOf<CitaDTO?>(null) }
     val serviciosFiltrados = when (filtroServicio) {
         1 -> uiState.serviciosConDetalle
             .filter { it.barberoDTOs.isNotEmpty() || it.clienteDTOs.isNotEmpty() }
@@ -1135,33 +1139,42 @@ private fun AdminServiciosTab(
                             Icon(
                                 if (mostrarFormulario) Icons.Filled.Close else Icons.Filled.Add,
                                 null, tint = Color.White, modifier = Modifier.size(20.dp))
-                        }
                     }
                 }
+            }
 
             item {
                 var expanded by remember { mutableStateOf(false) }
-                Box {
-                    OutlinedButton(onClick = { expanded = true }) {
-                        Text("Ordenar", color = colores.texto, fontSize = 14.sp)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(Icons.Filled.ArrowDropDown, null, tint = colores.textoSub)
-                    }
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        listOf(
-                            0 to "Todos", 1 to "Más populares",
-                            2 to "Precio bajo→alto", 3 to "Precio alto→bajo",
-                            4 to "Por tipo"
-                        ).forEach { (idx, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label,
-                                    color = if (filtroServicio == idx) ColorVerde else colores.texto) },
-                                onClick = { filtroServicio = idx; expanded = false }
-                            )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box {
+                        OutlinedButton(onClick = { expanded = true }) {
+                            Text("Ordenar", color = colores.texto, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(Icons.Filled.ArrowDropDown, null, tint = colores.textoSub)
                         }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            listOf(
+                                0 to "Todos", 1 to "Más populares",
+                                2 to "Precio bajo→alto", 3 to "Precio alto→bajo",
+                                4 to "Por tipo"
+                            ).forEach { (idx, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label,
+                                        color = if (filtroServicio == idx) ColorVerde else colores.texto) },
+                                    onClick = { filtroServicio = idx; expanded = false }
+                                )
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick = { mostrarHistorial = true },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AdminAccent),
+                        border = BorderStroke(1.dp, AdminAccent.copy(alpha = 0.5f))) {
+                        Icon(Icons.Filled.History, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Ver historial", fontSize = 13.sp)
                     }
                 }
             }
@@ -1351,6 +1364,89 @@ private fun AdminServiciosTab(
             }
         )
     }
+
+    // ── Historial de servicios ──
+    if (mostrarHistorial) {
+        val todasCitas = remember { mutableStateOf<List<CitaDTO>>(emptyList()) }
+        val citasAgrupadas = todasCitas.value
+            .sortedByDescending { it.fecha }
+            .groupBy { it.fecha }
+
+        LaunchedEffect(Unit) {
+            todasCitas.value = uiState.todasLasCitas
+        }
+
+        AlertDialog(
+            onDismissRequest = { mostrarHistorial = false; historialCitaSel = null },
+            containerColor = colores.superficie,
+            shape = RoundedCornerShape(20.dp),
+            title = { Text("Historial de servicios", color = colores.texto, fontWeight = FontWeight.Bold) },
+            text = {
+                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                    if (todasCitas.value.isEmpty()) {
+                        item { Text("Sin historial", color = colores.textoSub) }
+                    } else {
+                        citasAgrupadas.forEach { (fecha, citas) ->
+                            item {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+                                    HorizontalDivider(modifier = Modifier.weight(1f))
+                                    Text(" $fecha ", color = AdminAccent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    HorizontalDivider(modifier = Modifier.weight(1f))
+                                }
+                            }
+                            items(citas) { cita ->
+                                Row(modifier = Modifier.fillMaxWidth().clickable { historialCitaSel = cita }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Filled.ContentCut, null, tint = AdminAccent, modifier = Modifier.size(18.dp))
+                                    Column {
+                                        val nomServ = uiState.servicios.find { it.idServicio == cita.idServicio }?.nombre
+                                            ?: "Servicio #${cita.idServicio}"
+                                        Text(nomServ, color = colores.texto, fontSize = 13.sp)
+                                        Text("${cita.horaInicio.take(5)} · ${cita.estado?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: ""}",
+                                            color = colores.textoSub, fontSize = 11.sp)
+                                    }
+                                }
+                                HorizontalDivider(color = colores.borde.copy(0.3f))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { mostrarHistorial = false; historialCitaSel = null }) {
+                    Text("Cerrar", color = AdminAccent)
+                }
+            }
+        )
+    }
+
+    historialCitaSel?.let { cita ->
+        val nomCliente = uiState.todosUsuarios.find { it.idUsuario == cita.idUsuario }?.nombre ?: "Cliente #${cita.idUsuario}"
+        val nomBarbero = uiState.barberos.find { it.idBarbero == cita.idBarbero }?.nombre ?: "Barbero"
+        val nomServ = uiState.servicios.find { it.idServicio == cita.idServicio }?.nombre ?: "Servicio #${cita.idServicio}"
+        AlertDialog(
+            onDismissRequest = { historialCitaSel = null },
+            containerColor = colores.superficie,
+            shape = RoundedCornerShape(20.dp),
+            title = { Text("Cita #${cita.idCita}", color = colores.texto, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DetalleItem("Cliente", nomCliente, Icons.Filled.Person, colores)
+                    DetalleItem("Barbero", nomBarbero, Icons.Filled.ContentCut, colores)
+                    DetalleItem("Servicio", nomServ, Icons.Filled.ShoppingBag, colores)
+                    DetalleItem("Hora", "${cita.horaInicio.take(5)} - ${cita.horaFin?.take(5) ?: ""}", Icons.Filled.Schedule, colores)
+                    DetalleItem("Estado", cita.estado?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "", Icons.Filled.Info, colores)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { historialCitaSel = null }) {
+                    Text("Cerrar", color = AdminAccent)
+                }
+            }
+        )
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1396,7 +1492,7 @@ private fun AdminHorariosTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
                         Column {
-                            Text("Reseñas", color = colores.texto,
+                            Text("Horarios", color = colores.texto,
                                 fontSize = 22.sp, fontWeight = FontWeight.Bold)
                             Text("Selecciona un barbero para gestionar sus horarios",
                                     color = colores.textoSub, fontSize = 13.sp)
@@ -1669,7 +1765,7 @@ private fun AdminHorariosTab(
                                                 tint = AdminAccent, modifier = Modifier.size(18.dp))
                                         }
                                         Column {
-                                            Text("${horario.horaInicio?.take(5)} - ${horario.horaFin?.take(5)}",
+                                            Text("${horario.horaInicio.take(5)} - ${horario.horaFin.take(5)}",
                                                 color = colores.texto, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                             Text(diaSeleccionado!!.name.lowercase().replaceFirstChar { it.uppercase() },
                                                 color = colores.textoSub, fontSize = 11.sp)
@@ -1697,7 +1793,7 @@ private fun AdminHorariosTab(
             shape            = RoundedCornerShape(20.dp),
             title = { Text("Eliminar horario", color = colores.texto,
                 fontWeight = FontWeight.Bold) },
-            text  = { Text("¿Eliminar el horario de ${horario.horaInicio?.take(5)} a ${horario.horaFin?.take(5)}?",
+            text  = { Text("¿Eliminar el horario de ${horario.horaInicio.take(5)} a ${horario.horaFin.take(5)}?",
                 color = colores.textoSub, fontSize = 14.sp) },
             confirmButton = {
                 BarberiaBoton("Eliminar", colorFondo = ColorError, onClick = {
@@ -1765,7 +1861,7 @@ private fun AdminHorariosTab(
                         DetalleItem("Barbero", detalle.barberoNombre, Icons.Filled.ContentCut, colores)
                         DetalleItem("Servicio", detalle.servicioNombre, Icons.Filled.ShoppingBag, colores)
                         DetalleItem("Fecha", detalle.cita.fecha ?: "", Icons.Filled.CalendarMonth, colores)
-                        DetalleItem("Hora", detalle.cita.horaInicio?.take(5) ?: "", Icons.Filled.Schedule, colores)
+                        DetalleItem("Hora", detalle.cita.horaInicio.take(5), Icons.Filled.Schedule, colores)
                         DetalleItem("Precio", "\$${detalle.precio.toInt()}", Icons.Filled.AttachMoney, colores)
                     }
                 },
@@ -1810,6 +1906,8 @@ private fun AdminResenasTab(
     var resenaAEliminar        by remember { mutableStateOf<ResenaDTO?>(null) }
     var barberoFiltroResena    by remember { mutableStateOf<BarberoDTO?>(null) }
     var resenaSeleccionada     by remember { mutableStateOf<ResenaDTO?>(null) }
+    var mostrarTodasResenas    by remember { mutableStateOf(false) }
+    var barberoSeleccionado    by remember { mutableStateOf<BarberoDTO?>(null) }
     var isRefreshing           by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.cargarResenas() }
@@ -1870,23 +1968,75 @@ private fun AdminResenasTab(
                         colors = CardDefaults.cardColors(containerColor = colores.superficie),
                         elevation = CardDefaults.cardElevation(
                             defaultElevation = colores.sombra.dp)) {
-                        Column(modifier = Modifier.padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text("Promedio general",
                                 color = colores.textoSub, fontSize = 12.sp)
-                            Text("%.1f".format(promedioGeneral),
-                                color = ColorDorado, fontSize = 36.sp,
-                                fontWeight = FontWeight.Bold)
-                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                repeat(5) { i ->
-                                    Icon(
-                                        if (i < promedioGeneral.toInt()) Icons.Filled.Star
-                                        else Icons.Filled.StarOutline,
-                                        null, tint = ColorDorado, modifier = Modifier.size(16.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("%.1f".format(promedioGeneral),
+                                    color = ColorDorado, fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold)
+                                Icon(Icons.Filled.Star, null,
+                                    tint = ColorDorado, modifier = Modifier.size(28.dp))
+                                Text("${uiState.resenas.size} reseñas",
+                                    color = colores.textoSub, fontSize = 13.sp)
+                            }
+                            TextButton(onClick = { mostrarTodasResenas = true }) {
+                                Text("Ver todas", color = AdminAccent, fontSize = 13.sp)
+                            }
+                            if (uiState.resenas.isEmpty() && !uiState.isLoading) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)) {
+                                    Icon(Icons.Filled.StarOutline, null,
+                                        tint = colores.textoSub, modifier = Modifier.size(36.dp))
+                                    Text("No hay reseñas", color = colores.textoSub, fontSize = 14.sp)
+                                }
+                            } else {
+                                resenasFiltradas.forEach { resena ->
+                                    val barbero = uiState.barberos.find { it.idBarbero == resena.idBarbero }
+                                    val cliente = uiState.todosUsuarios.find { it.idUsuario == resena.idUsuario }
+                                    HorizontalDivider(color = colores.borde.copy(0.3f), modifier = Modifier.padding(vertical = 4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth().clickable { resenaSeleccionada = resena },
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Box(modifier = Modifier.size(36.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(AdminAccentSoft),
+                                            contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Filled.Star, null,
+                                                tint = AdminAccent, modifier = Modifier.size(18.dp))
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text(cliente?.nombre ?: "Cliente #${resena.idUsuario}",
+                                                    color = colores.texto,
+                                                    fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                                Box(Modifier.clip(RoundedCornerShape(4.dp))
+                                                    .background(ColorDorado.copy(0.15f))
+                                                    .padding(horizontal = 5.dp, vertical = 1.dp)) {
+                                                    Text("${resena.calificacion}★",
+                                                        color = ColorDorado, fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                            barbero?.let {
+                                                Text(it.nombre, color = colores.textoSub, fontSize = 10.sp)
+                                            }
+                                            resena.comentario?.let {
+                                                Text(it, color = colores.textoSub,
+                                                    fontSize = 11.sp, maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis)
+                                            }
+                                        }
+                                        IconButton(onClick = { resenaAEliminar = resena },
+                                            modifier = Modifier.size(28.dp)) {
+                                            Icon(Icons.Filled.DeleteOutline, null,
+                                                tint = ColorError, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
                                 }
                             }
-                            Text("${uiState.resenas.size} reseñas",
-                                color = colores.textoSub, fontSize = 12.sp)
                         }
                     }
                 }
@@ -1905,7 +2055,7 @@ private fun AdminResenasTab(
                         val promBarbero = resenasBarbero.map { it.calificacion }.average()
                         item {
                             Card(modifier = Modifier.fillMaxWidth()
-                                .clickable { barberoFiltroResena = barbero },
+                                .clickable { barberoSeleccionado = barbero },
                                 shape = RoundedCornerShape(14.dp),
                                 colors = CardDefaults.cardColors(
                                     containerColor = colores.superficie),
@@ -1939,75 +2089,50 @@ private fun AdminResenasTab(
                 }
             } else {
                 item {
-                    Text("Reseñas de ${barberoFiltroResena!!.nombre}",
-                        color = colores.texto, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-            }
-
-            if (uiState.resenas.isEmpty() && !uiState.isLoading) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().height(200.dp),
-                        contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Filled.StarOutline, null,
-                                tint = colores.textoSub, modifier = Modifier.size(48.dp))
-                            Text("No hay reseñas", color = colores.textoSub, fontSize = 15.sp)
-                        }
-                    }
-                }
-            } else {
-                items(resenasFiltradas) { resena ->
-                    val barbero = uiState.barberos.find {
-                        it.idBarbero == resena.idBarbero
-                    }
-                    val cliente = uiState.todosUsuarios.find {
-                        it.idUsuario == resena.idUsuario
-                    }
-                    Card(modifier = Modifier.fillMaxWidth()
-                        .clickable { resenaSeleccionada = resena },
+                    Card(modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = colores.superficie),
-                        elevation = CardDefaults.cardElevation(
-                            defaultElevation = colores.sombra.dp)) {
-                        Row(modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(modifier = Modifier.size(40.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(AdminAccentSoft),
-                                contentAlignment = Alignment.Center) {
-                                Icon(Icons.Filled.Star, null,
-                                    tint = AdminAccent, modifier = Modifier.size(20.dp))
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(cliente?.nombre ?: "Cliente #${resena.idUsuario}",
-                                        color = colores.texto,
-                                        fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
-                                        .background(ColorDorado.copy(0.15f))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)) {
-                                        Text("${resena.calificacion}★",
-                                            color = ColorDorado, fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold)
+                        elevation = CardDefaults.cardElevation(defaultElevation = colores.sombra.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Reseñas de ${barberoFiltroResena!!.nombre}",
+                                color = colores.texto, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Spacer(Modifier.height(8.dp))
+                            if (resenasFiltradas.isEmpty()) {
+                                Text("Sin reseñas", color = colores.textoSub, fontSize = 13.sp)
+                            } else {
+                                resenasFiltradas.forEach { resena ->
+                                    val cliente = uiState.todosUsuarios.find { it.idUsuario == resena.idUsuario }
+                                    HorizontalDivider(color = colores.borde.copy(0.3f), modifier = Modifier.padding(vertical = 4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth().clickable { resenaSeleccionada = resena },
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text(cliente?.nombre ?: "Cliente #${resena.idUsuario}",
+                                                    color = colores.texto,
+                                                    fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                                Box(Modifier.clip(RoundedCornerShape(4.dp))
+                                                    .background(ColorDorado.copy(0.15f))
+                                                    .padding(horizontal = 5.dp, vertical = 1.dp)) {
+                                                    Text("${resena.calificacion}★",
+                                                        color = ColorDorado, fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                            resena.comentario?.let {
+                                                Text(it, color = colores.textoSub,
+                                                    fontSize = 11.sp, maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis)
+                                            }
+                                        }
+                                        IconButton(onClick = { resenaAEliminar = resena },
+                                            modifier = Modifier.size(28.dp)) {
+                                            Icon(Icons.Filled.DeleteOutline, null,
+                                                tint = ColorError, modifier = Modifier.size(16.dp))
+                                        }
                                     }
                                 }
-                                barbero?.let {
-                                    Text(it.nombre, color = colores.textoSub,
-                                        fontSize = 11.sp)
-                                }
-                                resena.comentario?.let {
-                                    Text(it, color = colores.textoSub,
-                                        fontSize = 12.sp, maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis)
-                                }
-                            }
-                            IconButton(onClick = { resenaAEliminar = resena },
-                                modifier = Modifier.size(32.dp)) {
-                                Icon(Icons.Filled.DeleteOutline, null,
-                                    tint = ColorError, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -2079,6 +2204,86 @@ private fun AdminResenasTab(
             dismissButton = {
                 TextButton(onClick = { resenaAEliminar = null }) {
                     Text("Cancelar", color = colores.textoSub) }
+            }
+        )
+    }
+
+    // ── BottomSheet reseñas por barbero ──
+    barberoSeleccionado?.let { barbero ->
+        val resenasBarbero = uiState.resenas.filter { it.idBarbero == barbero.idBarbero }
+        val promedioBarbero = if (resenasBarbero.isEmpty()) 0.0
+        else resenasBarbero.map { it.calificacion }.average()
+
+        ModalBottomSheet(
+            onDismissRequest = { barberoSeleccionado = null },
+            containerColor = colores.superficie
+        ) {
+            Column(modifier = Modifier.padding(20.dp).fillMaxWidth()) {
+                Text(barbero.nombre, color = colores.texto, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("%.1f".format(promedioBarbero), color = ColorDorado, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Icon(Icons.Filled.Star, null, tint = ColorDorado, modifier = Modifier.size(20.dp))
+                    Text("${resenasBarbero.size} reseñas", color = colores.textoSub, fontSize = 13.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = colores.borde)
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(resenasBarbero) { resena ->
+                        val cliente = uiState.todosUsuarios.find { it.idUsuario == resena.idUsuario }
+                        Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = colores.superficie2)) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(cliente?.nombre ?: "Cliente #${resena.idUsuario}",
+                                        color = colores.texto, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                                    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(ColorDorado.copy(0.15f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                        Text("${resena.calificacion}★", color = ColorDorado, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                if (!resena.comentario.isNullOrBlank()) {
+                                    Text(resena.comentario, color = colores.textoSub, fontSize = 12.sp, maxLines = 3)
+                                }
+                            }
+                        }
+                    }
+                    item { Spacer(Modifier.height(8.dp)) }
+                }
+            }
+        }
+    }
+
+    // ── Diálogo "Ver todas" ──
+    if (mostrarTodasResenas) {
+        AlertDialog(
+            onDismissRequest = { mostrarTodasResenas = false },
+            containerColor = colores.superficie,
+            shape = RoundedCornerShape(20.dp),
+            title = { Text("Todas las reseñas", color = colores.texto, fontWeight = FontWeight.Bold) },
+            text = {
+                LazyColumn(modifier = Modifier.heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(uiState.resenas) { resena ->
+                        val barbero = uiState.barberos.find { it.idBarbero == resena.idBarbero }
+                        val cliente = uiState.todosUsuarios.find { it.idUsuario == resena.idUsuario }
+                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(cliente?.nombre ?: "Cliente #${resena.idUsuario}",
+                                    color = colores.texto, fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                Box(Modifier.clip(RoundedCornerShape(4.dp)).background(ColorDorado.copy(0.15f)).padding(horizontal = 4.dp, vertical = 1.dp)) {
+                                    Text("${resena.calificacion}★", color = ColorDorado, fontSize = 10.sp)
+                                }
+                                Text(barbero?.nombre ?: "", color = colores.textoSub, fontSize = 11.sp)
+                            }
+                            if (!resena.comentario.isNullOrBlank()) {
+                                Text(resena.comentario, color = colores.textoSub, fontSize = 11.sp, maxLines = 2)
+                            }
+                            HorizontalDivider(color = colores.borde.copy(0.3f))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { mostrarTodasResenas = false }) { Text("Cerrar", color = AdminAccent) }
             }
         )
     }
@@ -2200,7 +2405,7 @@ private fun TarjetaCitaAdmin(
                         Text(detalle.clienteNombre, color = colores.texto,
                             fontWeight = FontWeight.Bold, fontSize = 14.sp,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${detalle.cita.fecha} · ${detalle.cita.horaInicio?.take(5)}",
+                        Text("${detalle.cita.fecha} · ${detalle.cita.horaInicio.take(5)}",
                             color = colores.textoSub, fontSize = 12.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically,

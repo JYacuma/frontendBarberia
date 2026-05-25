@@ -1236,28 +1236,34 @@ private fun TarjetaCitaBarbero(
             if (cita.estado == EstadoCitaEnum.PENDIENTE ||
                 cita.estado == EstadoCitaEnum.EN_CURSO) {
                 HorizontalDivider(color = colores.borde)
-                Row(modifier = Modifier.padding(8.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(
                         onClick = onFinalizar,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorVerde),
-                        border = BorderStroke(1.dp, ColorVerde)
-                    ) { Text("Finalizar", fontSize = 12.sp) }
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ColorVerde),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Icon(Icons.Filled.CheckCircle, null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Finalizar", fontSize = 12.sp, maxLines = 1)
+                    }
                     if (cita.estado == EstadoCitaEnum.PENDIENTE) {
                         OutlinedButton(
                             onClick = onCancelar,
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorError),
-                            border = BorderStroke(1.dp, ColorError)
-                        ) { Text("Cancelar", fontSize = 12.sp) }
+                            modifier = Modifier.weight(1f).height(36.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) {
+                            Text("Cancelar", fontSize = 12.sp, maxLines = 1, color = ColorError)
+                        }
                     }
                     OutlinedButton(
                         onClick = onNoPresento,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = colores.textoSub),
-                        border = BorderStroke(1.dp, colores.textoSub)
-                    ) { Text("No se presentó", fontSize = 12.sp) }
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Text("No vino", fontSize = 12.sp, maxLines = 1)
+                    }
                 }
             }
         }

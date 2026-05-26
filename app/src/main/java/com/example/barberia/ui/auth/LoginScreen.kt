@@ -2,12 +2,15 @@ package com.example.barberia.ui.auth
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,7 +28,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
+import com.example.barberia.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
@@ -130,39 +136,24 @@ fun LoginScreen(
                     .graphicsLayer { alpha = logoAlpha }
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(colores.superficie2),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(RoundedCornerShape(50))
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            ColorRojo.copy(alpha = 0.3f),
-                                            Color.Transparent,
-                                            ColorAzul.copy(alpha = 0.3f)
-                                        )
-                                    )
-                                )
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ContentCut,
-                            contentDescription = "Logo Barbería",
-                            tint = ColorRojo,
-                            modifier = Modifier.size(38.dp)
-                        )
-                    }
+                    Image(
+                        painter = painterResource(R.drawable.icono),
+                        contentDescription = "Logo Barbería",
+                        modifier = Modifier.size(90.dp).clip(RoundedCornerShape(50))
+                            .border(
+                                2.dp,
+                                Brush.sweepGradient(
+                                    listOf(ColorRojo, ColorBlanco, ColorAzul, ColorRojo)
+                                ),
+                                CircleShape
+                            ),
+                        contentScale = ContentScale.Crop
+                    )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "BARBERÍA",
+                        text = "BARBER APP",
                         color = colores.texto,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,

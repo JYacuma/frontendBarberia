@@ -131,8 +131,8 @@ class SuperAdminViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                val response = apiService.createUsuario(
-                    UsuarioDTO(null, nombre, correo, null, password, rol, true)
+                val response = apiService.register(
+                    RegisterRequest(nombre, correo, password, rol = rol.name)
                 )
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(

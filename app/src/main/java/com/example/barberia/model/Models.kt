@@ -26,7 +26,8 @@ data class RegisterRequest(
     val nombre: String,
     val correoOTelefono: String,
     val password: String,
-    val telefono: String? = null
+    val telefono: String? = null,
+    val rol: String? = null
 )
 
 data class RegisterResponse(

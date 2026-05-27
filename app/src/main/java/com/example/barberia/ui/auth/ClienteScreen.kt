@@ -124,7 +124,7 @@ fun ClienteScreen(
         uiState.successMessage?.let {
             if (it == "¡Reseña enviada!") {
                 showResenaExitosa = true
-            } else {
+            } else if (it != "¡Cita agendada exitosamente!") {
                 snackbarState.showSnackbar(it)
             }
             viewModel.clearMessages()
@@ -596,9 +596,7 @@ private fun AgendarTab(
     var mostrarDialogoBarbero by remember { mutableStateOf<BarberoDTO?>(null) }
     var mostrarExito          by remember { mutableStateOf(false) }
     var filtroEspecialidad    by remember { mutableStateOf<String?>(null) }
-    var filtroServicioIdx     by remember { mutableIntStateOf(0) }
     var expandidoEspecialidad by remember { mutableStateOf(false) }
-    var expandidoServicio     by remember { mutableStateOf(false) }
 
     LaunchedEffect(barberoInicial) {
         barberoInicial?.let { barbero ->
@@ -608,6 +606,27 @@ private fun AgendarTab(
         }
     }
 
+    LaunchedEffect(uiState.successMessage) {
+        if (uiState.successMessage == "¡Cita agendada exitosamente!") {
+            mostrarExito = true
+        }
+    }
+
+    LaunchedEffect(filtroEspecialidad) {
+        if (!filtroEspecialidad.isNullOrBlank()) {
+            if (barberoSeleccionado?.especialidad != filtroEspecialidad) {
+                barberoSeleccionado = null
+            }
+            viewModel.cargarServiciosPorEspecialidad(filtroEspecialidad)
+        } else {
+            viewModel.cargarServiciosPorEspecialidad(null)
+        }
+        servicioSeleccionado = null
+        fechaSeleccionada = ""
+        horaSeleccionada = ""
+        viewModel.limpiarDisponibilidad()
+    }
+
     val especialidades = remember(uiState.barberos) {
         uiState.barberos.mapNotNull { it.especialidad }.distinct().sorted()
     }
@@ -615,16 +634,9 @@ private fun AgendarTab(
         if (filtroEspecialidad.isNullOrBlank()) uiState.barberos
         else uiState.barberos.filter { it.especialidad == filtroEspecialidad }
     }
-    val serviciosFiltrados = remember(filtroServicioIdx, uiState.servicios) {
-        when (filtroServicioIdx) {
-            1 -> uiState.servicios.sortedBy { it.precio }
-            2 -> uiState.servicios.sortedByDescending { it.precio }
-            else -> uiState.servicios
-        }
-    }
 
     val hoy = remember {
-        java.util.Calendar.getInstance().apply {
+        java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
             set(java.util.Calendar.HOUR_OF_DAY, 0)
             set(java.util.Calendar.MINUTE, 0)
             set(java.util.Calendar.SECOND, 0)
@@ -658,10 +670,10 @@ private fun AgendarTab(
     )
 
     fun millisAFecha(millis: Long): String {
-        val cal = java.util.Calendar.getInstance().apply {
-            timeInMillis = millis + timeZone.getOffset(millis)
+        val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+            timeInMillis = millis
         }
-        return "%d-%02d-%02d".format(
+        return "%04d-%02d-%02d".format(
             cal.get(java.util.Calendar.YEAR),
             cal.get(java.util.Calendar.MONTH) + 1,
             cal.get(java.util.Calendar.DAY_OF_MONTH)
@@ -815,6 +827,9 @@ private fun AgendarTab(
                     fechaSeleccionada = ""
                     horaSeleccionada = ""
                     pasoAgenda = 0
+                    filtroEspecialidad = null
+                    viewModel.limpiarDisponibilidad()
+                    viewModel.cargarServiciosPorEspecialidad(null)
                 })
             }
         )
@@ -874,12 +889,26 @@ private fun AgendarTab(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text("Todos") },
-                                    onClick = { filtroEspecialidad = null; expandidoEspecialidad = false }
+                                    onClick = {
+                                        filtroEspecialidad = null
+                                        expandidoEspecialidad = false
+                                        servicioSeleccionado = null
+                                        fechaSeleccionada = ""
+                                        horaSeleccionada = ""
+                                        viewModel.limpiarDisponibilidad()
+                                    }
                                 )
                                 especialidades.forEach { esp ->
                                     DropdownMenuItem(
                                         text = { Text(esp) },
-                                        onClick = { filtroEspecialidad = esp; expandidoEspecialidad = false }
+                                        onClick = {
+                                            filtroEspecialidad = esp
+                                            expandidoEspecialidad = false
+                                            servicioSeleccionado = null
+                                            fechaSeleccionada = ""
+                                            horaSeleccionada = ""
+                                            viewModel.limpiarDisponibilidad()
+                                        }
                                     )
                                 }
                             }
@@ -896,6 +925,10 @@ private fun AgendarTab(
                                 seleccionado = seleccionado,
                                 onClick = {
                                     barberoSeleccionado = barbero
+                                    servicioSeleccionado = null
+                                    fechaSeleccionada = ""
+                                    horaSeleccionada = ""
+                                    viewModel.limpiarDisponibilidad()
                                     viewModel.cargarHorariosBarbero(barbero.idBarbero!!)
                                 }
                             )
@@ -912,10 +945,17 @@ private fun AgendarTab(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         if (uiState.servicios.isEmpty()) {
-                            Box(modifier = Modifier.fillMaxWidth().height(80.dp),
-                                contentAlignment = Alignment.Center) {
-                                Text("No hay servicios disponibles",
-                                    color = colores.textoSub, fontSize = 13.sp)
+                            Box(
+                                modifier = Modifier.fillMaxWidth().height(80.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (filtroEspecialidad.isNullOrBlank())
+                                        "No hay servicios disponibles"
+                                    else
+                                        "No hay servicios para la especialidad seleccionada",
+                                    color = colores.textoSub, fontSize = 13.sp
+                                )
                             }
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -927,6 +967,9 @@ private fun AgendarTab(
                                             .shadow(4.dp, RoundedCornerShape(14.dp))
                                             .clickable {
                                                 servicioSeleccionado = servicio
+                                                fechaSeleccionada = ""
+                                                horaSeleccionada = ""
+                                                viewModel.limpiarDisponibilidad()
                                             },
                                         shape = RoundedCornerShape(14.dp),
                                         colors = CardDefaults.cardColors(
@@ -1073,9 +1116,8 @@ private fun AgendarTab(
                                 idBarbero  = barberoSeleccionado!!.idBarbero!!,
                                 idServicio = servicioSeleccionado!!.idServicio!!,
                                 fecha      = fechaSeleccionada,
-                                horaInicio = horaSeleccionada
+                                horaInicio = horaSeleccionada.take(5)
                             )
-                            mostrarExito = true
                         }
                     }
                 )

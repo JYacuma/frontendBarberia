@@ -67,7 +67,8 @@ data class ServicioDTO(
     val nombre: String,
     val descripcion: String? = null,
     val precio: Double,
-    val duracionMinutos: Int
+    val duracionMinutos: Int,
+    val especialidad: String? = null
 )
 
 // ── CITA ───────────────────────────────────────────────────────────────────

@@ -170,4 +170,7 @@ interface ApiService {
 
     @GET("api/notificaciones/cita/{idCita}")
     suspend fun getNotificacionesByCita(@Path("idCita") idCita: Long): Response<List<NotificacionDTO>>
+
+    @GET("api/servicios/especialidad/{especialidad}")
+    suspend fun getServiciosByEspecialidad(@Path("especialidad") especialidad: String): Response<List<ServicioDTO>>
 }

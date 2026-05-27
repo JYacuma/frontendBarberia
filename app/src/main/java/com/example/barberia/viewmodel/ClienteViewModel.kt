@@ -215,11 +215,14 @@ class ClienteViewModel(
                     )
                     cargarDatosIniciales()
                 } else {
+                    val errorBody = response.errorBody()?.string()
                     _uiState.value = _uiState.value.copy(
                         isLoading    = false,
                         errorMessage = when (response.code()) {
-                            400  -> "Horario no disponible, elige otro"
-                            else -> "Error al agendar (${response.code()})"
+                            400 -> errorBody ?: "Horario no disponible, elige otro"
+                            404 -> errorBody ?: "No se encontró la información para agendar"
+                            409 -> errorBody ?: "La cita entra en conflicto con otra reserva"
+                            else -> errorBody ?: "Error al agendar (${response.code()})"
                         }
                     )
                 }
@@ -296,6 +299,31 @@ class ClienteViewModel(
                 _uiState.value = _uiState.value.copy(
                     enviandoResena = false,
                     errorMessage   = "Sin conexión: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun cargarServiciosPorEspecialidad(especialidad: String?) {
+        viewModelScope.launch {
+            try {
+                val response = if (especialidad.isNullOrBlank()) {
+                    apiService.getServicios()
+                } else {
+                    apiService.getServiciosByEspecialidad(especialidad)
+                }
+                if (response.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(
+                        servicios = response.body() ?: emptyList()
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = "Error al cargar servicios (${response.code()})"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "Error al cargar servicios"
                 )
             }
         }
